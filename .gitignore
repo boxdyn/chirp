@@ -1,0 +1,6 @@
+/target
+# Chip-8 test ROMs
+/chip-8
+
+# VS Code files
+/.vscode
