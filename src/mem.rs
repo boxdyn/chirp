@@ -63,7 +63,7 @@ impl Mem {
     ///
     /// # Examples
     /// ``` rust
-    /// # use rumpulator::prelude::*;
+    /// # use chumpulator::prelude::*;
     /// let mem = Mem::new(0x100);
     /// assert_eq!(mem.len(), 0x100)
     /// ```
@@ -84,7 +84,7 @@ impl Mem {
         self
     }
 
-    /// Load a character set from rumpulator/src/mem/charset.bin into this memory section
+    /// Load a character set from chumpulator/src/mem/charset.bin into this memory section
     pub fn load_charset(self, addr: u16) -> Self {
         let charset = include_bytes!("mem/charset.bin");
         self.load(addr, charset)
@@ -94,7 +94,7 @@ impl Mem {
     ///
     /// # Examples
     /// ```rust
-    /// # use rumpulator::prelude::*;
+    /// # use chumpulator::prelude::*;
     /// let length = 0x100;
     /// let mem = Mem::new(length);
     /// ```

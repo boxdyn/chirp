@@ -73,7 +73,7 @@ impl CPU {
     /// Set a general purpose register in the CPU
     /// # Examples
     /// ```rust
-    /// # use rumpulator::prelude::*;
+    /// # use chumpulator::prelude::*;
     /// // Create a new CPU, and set v4 to 0x41
     /// let cpu = CPU::default()
     ///     .set_gpr(0x4, 0x41);
@@ -97,7 +97,7 @@ impl CPU {
     /// | sp     | 0x0efe  | Initial top of stack.
     /// # Examples
     /// ```rust
-    /// # use rumpulator::prelude::*;
+    /// # use chumpulator::prelude::*;
     /// let mut cpu = CPU::new(0xf00, 0x50, 0x200, 0xefe, Disassemble::default());
     /// ```
     pub fn new(screen: Adr, font: Adr, pc: Adr, sp: Adr, disassembler: Disassemble) -> Self {

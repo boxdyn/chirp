@@ -5,7 +5,7 @@ use std::ops::Range;
 ///
 /// # Examples
 /// ```rust
-/// # use rumpulator::prelude::*;
+/// # use chumpulator::prelude::*;
 /// let mem = Mem::new(0x50);
 /// // Dumps the first 0x10 bytes
 /// mem.dump(0x00..0x10);
@@ -19,7 +19,7 @@ pub trait Dumpable {
 ///
 /// # Examples
 /// ```rust
-/// # use rumpulator::prelude::*;
+/// # use chumpulator::prelude::*;
 /// let mem = bus! {
 ///    "mem" [0..0x10] = Mem::new(0x10)
 /// };

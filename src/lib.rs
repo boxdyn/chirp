@@ -15,7 +15,7 @@ pub mod dump;
 pub mod error;
 pub mod screen;
 
-/// Common imports for rumpulator
+/// Common imports for chumpulator
 pub mod prelude {
     use super::*;
     pub use crate::bus;

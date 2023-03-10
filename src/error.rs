@@ -1,4 +1,4 @@
-//! Error type for rumpulator
+//! Error type for chumpulator
 
 use thiserror::Error;
 

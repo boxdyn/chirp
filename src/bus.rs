@@ -11,7 +11,7 @@ use std::{
 /// Creates a new bus, instantiating BusConnectable devices
 /// # Examples
 /// ```rust
-/// # use rumpulator::prelude::*;
+/// # use chumpulator::prelude::*;
 /// let mut bus = bus! {
 ///     "RAM" [0x0000..0x8000] Mem::new(0x8000),
 ///     "ROM" [0x8000..0xFFFF] Mem::new(0x8000).w(false),

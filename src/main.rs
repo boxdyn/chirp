@@ -1,4 +1,4 @@
-use rumpulator::{bus::Read, prelude::*};
+use chumpulator::{bus::Read, prelude::*};
 use std::fs::read;
 
 fn main() -> Result<(), std::io::Error> {
@@ -8,7 +8,7 @@ fn main() -> Result<(), std::io::Error> {
         // Load the ROM file into RAM
         "userram" [0x0200..0x0F00] = Mem::new(0xF00 - 0x200).load(0, &read("chip-8/Fishie.ch8")?),
         // Create a screen
-        "screen"  [0x0F00..0x1000] = Screen::new(32, 64),
+        "screen"  [0x0F00..0x1000] = Mem::new(32*64/8),
         // Create some stack memory
         "stack"   [0xF000..0xF800] = Mem::new(0x800).r(true).w(true),
     };
