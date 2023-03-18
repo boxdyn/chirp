@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 owo-colors = "^3"
+rhexdump = "0.1.1"
 serde = { version = "^1.0", features = ["derive"] }
 thiserror = "1.0.39"

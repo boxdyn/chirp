@@ -19,7 +19,8 @@ pub mod screen;
 pub mod prelude {
     use super::*;
     pub use crate::bus;
-    pub use bus::{Bus, BusConnectible};
+    pub use crate::newbus;
+    pub use bus::{Bus, BusConnectible, Read, Write};
     pub use cpu::{disassemble::Disassemble, CPU};
     pub use dump::{BinDumpable, Dumpable};
     pub use mem::Mem;

@@ -3,7 +3,7 @@
 pub mod disassemble;
 
 use self::disassemble::Disassemble;
-use crate::bus::{Bus, Read, Write};
+use crate::bus::{Read, Write};
 use owo_colors::OwoColorize;
 
 type Reg = usize;
@@ -116,7 +116,10 @@ impl CPU {
         }
     }
 
-    pub fn tick(&mut self, bus: &mut Bus) {
+    pub fn tick<B>(&mut self, bus: &mut B)
+    where
+        B: Read<u8> + Write<u8> + Read<u16> + Write<u16>
+    {
         std::print!("{:3} {:03x}: ", self.cycle.bright_black(), self.pc);
         // fetch opcode
         let opcode: u16 = bus.read(self.pc);
@@ -205,7 +208,7 @@ impl CPU {
             // Cxbb: Stores a random number + the provided byte into vX
             0xc => self.rand(x, b),
             // Dxyn: Draws n-byte sprite to the screen at coordinates (vX, vY)
-            0xd => self.draw(x, y, n),
+            0xd => self.draw(x, y, n, bus),
 
             // # Skips instruction on value of keypress
             // |opcode| effect                             |
@@ -231,12 +234,12 @@ impl CPU {
             // | fX55 | DMA Stor from I to registers 0..X  |
             // | fX65 | DMA Load from I to registers 0..X  |
             0xf => match b {
-                0x07 => self.get_delay_timer(x, bus),
-                0x0A => self.wait_for_key(x, bus),
-                0x15 => self.load_delay_timer(x, bus),
-                0x18 => self.load_sound_timer(x, bus),
-                0x1E => self.add_to_indirect(x, bus),
-                0x29 => self.load_sprite_x(x, bus),
+                0x07 => self.get_delay_timer(x),
+                0x0A => self.wait_for_key(x),
+                0x15 => self.load_delay_timer(x),
+                0x18 => self.load_sound_timer(x),
+                0x1E => self.add_to_indirect(x),
+                0x29 => self.load_sprite_x(x),
                 0x33 => self.bcd_convert_i(x, bus),
                 0x55 => self.dma_store(x, bus),
                 0x65 => self.dma_load(x, bus),
@@ -290,7 +293,7 @@ impl CPU {
     }
     /// 00e0: Clears the screen memory to 0
     #[inline]
-    fn clear_screen(&mut self, bus: &mut Bus) {
+    fn clear_screen(&mut self, bus: &mut impl Write<u8>) {
         for addr in self.screen..self.screen + 0x100 {
             bus.write(addr, 0u8);
         }
@@ -299,7 +302,7 @@ impl CPU {
     }
     /// 00ee: Returns from subroutine
     #[inline]
-    fn ret(&mut self, bus: &mut Bus) {
+    fn ret(&mut self, bus: &impl Read<u16>) {
         self.sp = self.sp.wrapping_add(2);
         self.pc = bus.read(self.sp);
     }
@@ -310,7 +313,7 @@ impl CPU {
     }
     /// 2aaa: Pushes pc onto the stack, then jumps to a
     #[inline]
-    fn call(&mut self, a: Adr, bus: &mut Bus) {
+    fn call(&mut self, a: Adr, bus: &mut impl Write<u16>) {
         bus.write(self.sp, self.pc);
         self.sp = self.sp.wrapping_sub(2);
         self.pc = a;
@@ -427,12 +430,23 @@ impl CPU {
     }
     /// Dxyn: Draws n-byte sprite to the screen at coordinates (vX, vY)
     #[inline]
-    fn draw(&mut self, x: Reg, y: Reg, n: Nib) {
-        // TODO: Screen
-        todo!("{}", format_args!("draw\t#{n:x}, v{x:x}, v{y:x}").red());
+    fn draw<I>(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut I)
+    where
+        I: Read<u8> + Read<u16>
+    {
+        println!("{}", format_args!("draw\t#{n:x}, v{x:x}, v{y:x}").red());
+        self.v[0xf] = 0;
         // TODO: Repeat for all N
-        // TODO: Calculate the lower bound address based on the X,Y position on the screen
-        // TODO: Read a u16 from the bus containing the two bytes which might need to be updated
+        for byte in 0..n as u16 {
+            // TODO: Calculate the lower bound address based on the X,Y position on the screen
+            let lower_bound = ((y as u16 + byte) * 8) + x as u16 / 8;
+            // TODO: Read a byte of sprite data into a u16, and shift it x % 8 bits
+            let sprite_line: u8 = bus.read(self.i);
+            // TODO: Read a u16 from the bus containing the two bytes which might need to be updated
+            let screen_word: u16 = bus.read(self.screen + lower_bound);
+            // TODO: Update the screen word by XORing the sprite byte
+            todo!("{sprite_line}, {screen_word}")
+        }
     }
     /// Ex9E: Skip next instruction if key == #X
     #[inline]
@@ -457,12 +471,12 @@ impl CPU {
     /// vX = DT
     /// ```
     #[inline]
-    fn get_delay_timer(&mut self, x: Reg, _bus: &mut Bus) {
+    fn get_delay_timer(&mut self, x: Reg) {
         self.v[x] = self.delay;
     }
     /// Fx0A: Wait for key, then vX = K
     #[inline]
-    fn wait_for_key(&mut self, x: Reg, _bus: &mut Bus) {
+    fn wait_for_key(&mut self, x: Reg) {
         // TODO: I/O
 
         std::println!("{}", format_args!("waitk\tv{x:x}").red());
@@ -472,7 +486,7 @@ impl CPU {
     /// DT = vX
     /// ```
     #[inline]
-    fn load_delay_timer(&mut self, x: Reg, _bus: &mut Bus) {
+    fn load_delay_timer(&mut self, x: Reg) {
         self.delay = self.v[x];
     }
     /// Fx18: Load vX into ST
@@ -480,7 +494,7 @@ impl CPU {
     /// ST = vX;
     /// ```
     #[inline]
-    fn load_sound_timer(&mut self, x: Reg, _bus: &mut Bus) {
+    fn load_sound_timer(&mut self, x: Reg) {
         self.sound = self.v[x];
     }
     /// Fx1e: Add vX to I,
@@ -488,7 +502,7 @@ impl CPU {
     /// I += vX;
     /// ```
     #[inline]
-    fn add_to_indirect(&mut self, x: Reg, _bus: &mut Bus) {
+    fn add_to_indirect(&mut self, x: Reg) {
         self.i += self.v[x] as u16;
     }
     /// Fx29: Load sprite for character x into I
@@ -496,19 +510,19 @@ impl CPU {
     /// I = sprite(X);
     /// ```
     #[inline]
-    fn load_sprite_x(&mut self, x: Reg, _bus: &mut Bus) {
+    fn load_sprite_x(&mut self, x: Reg) {
         self.i = self.font + (5 * x as Adr);
     }
     /// Fx33: BCD convert X into I`[0..3]`
     #[inline]
-    fn bcd_convert_i(&mut self, x: Reg, _bus: &mut Bus) {
+    fn bcd_convert_i(&mut self, x: Reg, _bus: &mut impl Write<u8>) {
         // TODO: I/O
 
         std::println!("{}", format_args!("bcd\t{x:x}, &I").red());
     }
     /// Fx55: DMA Stor from I to registers 0..X
     #[inline]
-    fn dma_store(&mut self, x: Reg, bus: &mut Bus) {
+    fn dma_store(&mut self, x: Reg, bus: &mut impl Write<u8>) {
         for reg in 0..=x {
             bus.write(self.i + reg as u16, self.v[reg]);
         }
@@ -516,7 +530,7 @@ impl CPU {
     }
     /// Fx65: DMA Load from I to registers 0..X
     #[inline]
-    fn dma_load(&mut self, x: Reg, bus: &mut Bus) {
+    fn dma_load(&mut self, x: Reg, bus: &mut impl Read<u8>) {
         for reg in 0..=x {
             self.v[reg] = bus.read(self.i + reg as u16);
         }

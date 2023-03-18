@@ -42,6 +42,9 @@ impl BusConnectible for BusDevice {
             self.device.write_to(addr, data);
         }
     }
+    fn get_mut(&mut self, addr: u16) -> Option<&mut u8> {
+        return self.device.get_mut(addr);
+    }
 }
 
 impl Display for BusDevice {

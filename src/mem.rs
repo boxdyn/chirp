@@ -144,4 +144,10 @@ impl BusConnectible for Mem {
                 *value = data
         }
     }
+    fn get_mut(&mut self, addr: u16) -> Option<&mut u8> {
+        if !self.attr.w {
+            return None;
+        }
+        self.mem.get_mut(addr as usize)
+    }
 }
