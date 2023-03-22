@@ -178,190 +178,190 @@ impl Disassemble {
 impl Disassemble {
     /// Unused instructions
     fn unimplemented(&self, opcode: u16) -> String {
-        format!("inval\t{opcode:04x}")
+        format!("inval  {opcode:04x}")
             .style(self.invalid)
             .to_string()
     }
     /// `0aaa`: Handles a "machine language function call" (lmao)
     pub fn sys(&self, a: Adr) -> String {
-        format!("sysc\t{a:03x}").style(self.invalid).to_string()
+        format!("sysc   {a:03x}").style(self.invalid).to_string()
     }
     /// `00e0`: Clears the screen memory to 0
     pub fn clear_screen(&self) -> String {
-        "cls".style(self.normal).to_string()
+        "cls    ".style(self.normal).to_string()
     }
     /// `00ee`: Returns from subroutine
     pub fn ret(&self) -> String {
-        "ret".style(self.normal).to_string()
+        "ret    ".style(self.normal).to_string()
     }
     /// `1aaa`: Sets the program counter to an absolute address
     pub fn jump(&self, a: Adr) -> String {
-        format!("jmp\t{a:03x}").style(self.normal).to_string()
+        format!("jmp    {a:03x}").style(self.normal).to_string()
     }
     /// `2aaa`: Pushes pc onto the stack, then jumps to a
     pub fn call(&self, a: Adr) -> String {
-        format!("call\t{a:03x}").style(self.normal).to_string()
+        format!("call   {a:03x}").style(self.normal).to_string()
     }
     /// `3xbb`: Skips the next instruction if register X == b
     pub fn skip_if_x_equal_byte(&self, x: Reg, b: u8) -> String {
-        format!("se\t#{b:02x}, v{x:X}")
+        format!("se     #{b:02x}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `4xbb`: Skips the next instruction if register X != b
     pub fn skip_if_x_not_equal_byte(&self, x: Reg, b: u8) -> String {
-        format!("sne\t#{b:02x}, v{x:X}")
+        format!("sne    #{b:02x}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `5xy0`: Skips the next instruction if register X != register Y
     pub fn skip_if_x_equal_y(&self, x: Reg, y: Reg) -> String {
-        format!("se\tv{x:X}, v{y:X}").style(self.normal).to_string()
+        format!("se     v{x:X}, v{y:X}").style(self.normal).to_string()
     }
 
     /// `6xbb`: Loads immediate byte b into register vX
     pub fn load_immediate(&self, x: Reg, b: u8) -> String {
-        format!("mov\t#{b:02x}, v{x:X}")
+        format!("mov    #{b:02x}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `7xbb`: Adds immediate byte b to register vX
     pub fn add_immediate(&self, x: Reg, b: u8) -> String {
-        format!("add\t#{b:02x}, v{x:X}")
+        format!("add    #{b:02x}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `8xy0`: Loads the value of y into x
     pub fn load_y_into_x(&self, x: Reg, y: Reg) -> String {
-        format!("mov\tv{y:X}, v{x:X}")
+        format!("mov    v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `8xy1`: Performs bitwise or of vX and vY, and stores the result in vX
     pub fn x_orequals_y(&self, x: Reg, y: Reg) -> String {
-        format!("or\tv{y:X}, v{x:X}").style(self.normal).to_string()
+        format!("or     v{y:X}, v{x:X}").style(self.normal).to_string()
     }
     /// `8xy2`: Performs bitwise and of vX and vY, and stores the result in vX
     pub fn x_andequals_y(&self, x: Reg, y: Reg) -> String {
-        format!("and\tv{y:X}, v{x:X}")
+        format!("and    v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
 
     /// `8xy3`: Performs bitwise xor of vX and vY, and stores the result in vX
     pub fn x_xorequals_y(&self, x: Reg, y: Reg) -> String {
-        format!("xor\tv{y:X}, v{x:X}")
+        format!("xor    v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `8xy4`: Performs addition of vX and vY, and stores the result in vX
     pub fn x_addequals_y(&self, x: Reg, y: Reg) -> String {
-        format!("add\tv{y:X}, v{x:X}")
+        format!("add    v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `8xy5`: Performs subtraction of vX and vY, and stores the result in vX
     pub fn x_subequals_y(&self, x: Reg, y: Reg) -> String {
-        format!("sub\tv{y:X}, v{x:X}")
+        format!("sub    v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `8xy6`: Performs bitwise right shift of vX
     pub fn shift_right_x(&self, x: Reg) -> String {
-        format!("shr\tv{x:X}").style(self.normal).to_string()
+        format!("shr    v{x:X}").style(self.normal).to_string()
     }
     /// `8xy7`: Performs subtraction of vY and vX, and stores the result in vX
     pub fn backwards_subtract(&self, x: Reg, y: Reg) -> String {
-        format!("bsub\tv{y:X}, v{x:X}")
+        format!("bsub   v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// 8X_E: Performs bitwise left shift of vX
     pub fn shift_left_x(&self, x: Reg) -> String {
-        format!("shl\tv{x:X}").style(self.normal).to_string()
+        format!("shl    v{x:X}").style(self.normal).to_string()
     }
     /// `9xy0`: Skip next instruction if X != y
     pub fn skip_if_x_not_equal_y(&self, x: Reg, y: Reg) -> String {
-        format!("sn\tv{x:X}, v{y:X}").style(self.normal).to_string()
+        format!("sne    v{x:X}, v{y:X}").style(self.normal).to_string()
     }
     /// Aadr: Load address #adr into register I
     pub fn load_indirect_register(&self, a: Adr) -> String {
-        format!("mov\t${a:03x}, I").style(self.normal).to_string()
+        format!("mov    ${a:03x}, I").style(self.normal).to_string()
     }
     /// Badr: Jump to &adr + v0
     pub fn jump_indexed(&self, a: Adr) -> String {
-        format!("jmp\t${a:03x}+v0").style(self.normal).to_string()
+        format!("jmp    ${a:03x}+v0").style(self.normal).to_string()
     }
     /// `Cxbb`: Stores a random number + the provided byte into vX
     /// Pretty sure the input byte is supposed to be the seed of a LFSR or something
     pub fn rand(&self, x: Reg, b: u8) -> String {
-        format!("rand\t#{b:X}, v{x:X}")
+        format!("rand   #{b:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `Dxyn`: Draws n-byte sprite to the screen at coordinates (vX, vY)
     pub fn draw(&self, x: Reg, y: Reg, n: Nib) -> String {
         #[rustfmt::skip]
-        format!("draw\t#{n:x}, v{x:X}, v{y:X}").style(self.normal).to_string()
+        format!("draw   #{n:x}, v{x:X}, v{y:X}").style(self.normal).to_string()
     }
     /// `Ex9E`: Skip next instruction if key == #X
     pub fn skip_if_key_equals_x(&self, x: Reg) -> String {
-        format!("sek\tv{x:X}").style(self.normal).to_string()
+        format!("sek    v{x:X}").style(self.normal).to_string()
     }
     /// `ExaE`: Skip next instruction if key != #X
     pub fn skip_if_key_not_x(&self, x: Reg) -> String {
-        format!("snek\tv{x:X}").style(self.normal).to_string()
+        format!("snek   v{x:X}").style(self.normal).to_string()
     }
     /// `Fx07`: Get the current DT, and put it in vX
     /// ```py
     /// vX = DT
     /// ```
     pub fn get_delay_timer(&self, x: Reg) -> String {
-        format!("mov\tDT, v{x:X}").style(self.normal).to_string()
+        format!("mov    DT, v{x:X}").style(self.normal).to_string()
     }
     /// `Fx0A`: Wait for key, then vX = K
     pub fn wait_for_key(&self, x: Reg) -> String {
-        format!("waitk\tv{x:X}").style(self.normal).to_string()
+        format!("waitk  v{x:X}").style(self.normal).to_string()
     }
     /// `Fx15`: Load vX into DT
     /// ```py
     /// DT = vX
     /// ```
     pub fn load_delay_timer(&self, x: Reg) -> String {
-        format!("ld\tv{x:X}, DT").style(self.normal).to_string()
+        format!("ld     v{x:X}, DT").style(self.normal).to_string()
     }
     /// `Fx18`: Load vX into ST
     /// ```py
     /// ST = vX;
     /// ```
     pub fn load_sound_timer(&self, x: Reg) -> String {
-        format!("ld\tv{x:X}, ST").style(self.normal).to_string()
+        format!("ld     v{x:X}, ST").style(self.normal).to_string()
     }
     /// `Fx1e`: Add vX to I,
     /// ```py
     /// I += vX;
     /// ```
     pub fn add_to_indirect(&self, x: Reg) -> String {
-        format!("add\tv{x:X}, I").style(self.normal).to_string()
+        format!("add    v{x:X}, I").style(self.normal).to_string()
     }
     /// `Fx29`: Load sprite for character x into I
     /// ```py
     /// I = sprite(X);
     /// ```
     pub fn load_sprite_x(&self, x: Reg) -> String {
-        format!("font\t#{x:X}, I").style(self.normal).to_string()
+        format!("font   #{x:X}, I").style(self.normal).to_string()
     }
     /// `Fx33`: BCD convert X into I`[0..3]`
     pub fn bcd_convert_i(&self, x: Reg) -> String {
-        format!("bcd\t{x:X}, &I").style(self.normal).to_string()
+        format!("bcd    {x:X}, &I").style(self.normal).to_string()
     }
     /// `Fx55`: DMA Stor from I to registers 0..X
     pub fn dma_store(&self, x: Reg) -> String {
-        format!("dmao\t{x:X}").style(self.normal).to_string()
+        format!("dmao   {x:X}").style(self.normal).to_string()
     }
     /// `Fx65`: DMA Load from I to registers 0..X
     pub fn dma_load(&self, x: Reg) -> String {
-        format!("dmai\t{x:X}").style(self.normal).to_string()
+        format!("dmai   {x:X}").style(self.normal).to_string()
     }
 }
 

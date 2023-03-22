@@ -3,45 +3,35 @@
 pub mod disassemble;
 
 use self::disassemble::Disassemble;
-use crate::bus::{Read, Write};
+use crate::bus::{Bus, Read, Write};
 use owo_colors::OwoColorize;
+use rand::random;
+use std::time::Instant;
 
 type Reg = usize;
 type Adr = u16;
 type Nib = u8;
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct CPUBuilder {
-    screen: Option<Adr>,
-    font: Option<Adr>,
-    pc: Option<Adr>,
-    sp: Option<Adr>,
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ControlFlags {
+    pub debug: bool,
+    pub pause: bool,
+    pub keypause: bool,
+    pub authentic: bool,
 }
 
-impl CPUBuilder {
-    pub fn new() -> Self {
-        CPUBuilder {
-            screen: None,
-            font: None,
-            pc: None,
-            sp: None,
-        }
+impl ControlFlags {
+    pub fn debug(&mut self) {
+        self.debug = !self.debug
     }
-    pub fn build(self) -> CPU {
-        CPU {
-            screen: self.screen.unwrap_or(0xF00),
-            font: self.font.unwrap_or(0x050),
-            pc: self.pc.unwrap_or(0x200),
-            sp: self.sp.unwrap_or(0xefe),
-            i: 0,
-            v: [0; 16],
-            delay: 0,
-            sound: 0,
-            cycle: 0,
-            keys: 0,
-            disassembler: Disassemble::default(),
-        }
+    pub fn pause(&mut self) {
+        self.pause = !self.pause
     }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Keys {
+    keys: [bool; 16],
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -57,19 +47,30 @@ pub struct CPU {
     delay: u8,
     sound: u8,
     // I/O
-    keys: usize,
+    pub keys: [bool; 16],
+    pub flags: ControlFlags,
     // Execution data
     cycle: usize,
+    breakpoints: Vec<Adr>,
     disassembler: Disassemble,
 }
 
 // public interface
 impl CPU {
     /// Press keys (where `keys` is a bitmap of the keys [F-0])
-    pub fn press(mut self, keys: u16) -> Self {
-        self.keys = keys as usize;
-        self
+    pub fn press(&mut self, key: usize) {
+        if (0..16).contains(&key) {
+            self.keys[key] = true;
+            self.flags.keypause = false;
+        }
     }
+    /// Release all keys
+    pub fn release(&mut self) {
+        for key in &mut self.keys {
+            *key = false;
+        }
+    }
+
     /// Set a general purpose register in the CPU
     /// # Examples
     /// ```rust
@@ -80,11 +81,10 @@ impl CPU {
     /// // Dump the CPU registers
     /// cpu.dump();
     /// ```
-    pub fn set_gpr(mut self, gpr: Reg, value: u8) -> Self {
+    pub fn set_gpr(&mut self, gpr: Reg, value: u8) {
         if let Some(gpr) = self.v.get_mut(gpr) {
             *gpr = value;
         }
-        self
     }
 
     /// Constructs a new CPU with sane defaults
@@ -112,23 +112,80 @@ impl CPU {
             delay: 0,
             sound: 0,
             cycle: 0,
-            keys: 0,
+            keys: [false; 16],
+            breakpoints: vec![],
+            flags: ControlFlags {
+                debug: true,
+                ..Default::default()
+            },
         }
     }
 
-    pub fn tick<B>(&mut self, bus: &mut B)
-    where
-        B: Read<u8> + Write<u8> + Read<u16> + Write<u16>
-    {
-        std::print!("{:3} {:03x}: ", self.cycle.bright_black(), self.pc);
+    /// Get the program counter
+    pub fn pc(&self) -> Adr {
+        self.pc
+    }
+
+    /// Soft resets the CPU, releasing keypause and reinitializing the program counter to 0x200
+    pub fn soft_reset(&mut self) {
+        self.pc = 0x200;
+        self.flags.keypause = false;
+    }
+
+    /// Set a breakpoint
+    pub fn set_break(&mut self, point: Adr) {
+        if !self.breakpoints.contains(&point) {
+            self.breakpoints.push(point)
+        }
+    }
+
+    /// Unset a breakpoint
+    pub fn unset_break(&mut self, point: Adr) {
+        fn linear_find(needle: Adr, haystack: &Vec<Adr>) -> Option<usize> {
+            for (i, v) in haystack.iter().enumerate() {
+                if *v == needle {
+                    return Some(i);
+                }
+            }
+            None
+        }
+        if let Some(idx) = linear_find(point, &self.breakpoints) {
+            assert_eq!(point, self.breakpoints.swap_remove(idx));
+        }
+    }
+
+    /// Unpauses the emulator for a single tick
+    /// NOTE: does not synchronize with delay timers
+    pub fn singlestep(&mut self, bus: &mut Bus) {
+            self.flags.pause = false;
+            self.tick(bus);
+            self.flags.pause = true;
+    }
+
+    /// Ticks the delay and sound timers
+    pub fn tick_timer(&mut self) {
+        if self.flags.pause {
+            return;
+        }
+        self.delay = self.delay.saturating_sub(1);
+        self.sound = self.sound.saturating_sub(1);
+    }
+
+    /// Runs a single instruction
+    pub fn tick(&mut self, bus: &mut Bus) {
+        // Do nothing if paused
+        if self.flags.pause || self.flags.keypause {
+            return;
+        }
+        let time = Instant::now();
         // fetch opcode
         let opcode: u16 = bus.read(self.pc);
+        let pc = self.pc;
+
         // DINC pc
         self.pc = self.pc.wrapping_add(2);
         // decode opcode
-        // Print opcode disassembly:
 
-        std::println!("{}", self.disassembler.instruction(opcode));
         use disassemble::{a, b, i, n, x, y};
         let (i, x, y, n, b, a) = (
             i(opcode),
@@ -246,9 +303,24 @@ impl CPU {
                 _ => self.unimplemented(opcode),
             },
             _ => unimplemented!("Extracted nibble from byte, got >nibble?"),
+            
         }
-
+        let elapsed = time.elapsed();
+        // Print opcode disassembly:
+        if self.flags.debug {
+            std::println!(
+                "{:3} {:03x}: {:<36}{:?}",
+                self.cycle.bright_black(),
+                pc,
+                self.disassembler.instruction(opcode),
+                elapsed.dimmed()
+            );
+        }
         self.cycle += 1;
+        // process breakpoints
+        if self.breakpoints.contains(&self.pc) {
+            self.flags.pause = true;
+        }
     }
 
     pub fn dump(&self) {
@@ -275,7 +347,24 @@ impl CPU {
 
 impl Default for CPU {
     fn default() -> Self {
-        CPUBuilder::new().build()
+        CPU {
+            screen: 0xf00,
+            font: 0x050,
+            pc: 0x200,
+            sp: 0xefe,
+            i: 0,
+            v: [0; 16],
+            delay: 0,
+            sound: 0,
+            cycle: 0,
+            keys: [false; 16],
+            flags: ControlFlags {
+                debug: true,
+                ..Default::default()
+            },
+            breakpoints: vec![],
+            disassembler: Disassemble::default(),
+        }
     }
 }
 
@@ -293,9 +382,11 @@ impl CPU {
     }
     /// 00e0: Clears the screen memory to 0
     #[inline]
-    fn clear_screen(&mut self, bus: &mut impl Write<u8>) {
-        for addr in self.screen..self.screen + 0x100 {
-            bus.write(addr, 0u8);
+    fn clear_screen(&mut self, bus: &mut Bus) {
+        if let Some(screen) = bus.get_region_mut("screen") {
+            for byte in screen {
+                *byte = 0;
+            }
         }
         //use dump::BinDumpable;
         //bus.bin_dump(self.screen as usize..self.screen as usize + 0x100);
@@ -351,9 +442,9 @@ impl CPU {
     }
     /// Set the carry register (vF) after math
     #[inline]
-    fn set_carry(&mut self, x: Reg, y: Reg, f: fn(u16, u16) -> u16) -> u8 {
+    fn set_carry(&mut self, x: Reg, y: Reg, f: fn(u16, u16) -> u16, inv: bool) -> u8 {
         let sum = f(self.v[x] as u16, self.v[y] as u16);
-        self.v[0xf] = if sum & 0xff00 != 0 { 1 } else { 0 };
+        self.v[0xf] = if (sum & 0xff00 != 0) ^ inv { 1 } else { 0 };
         (sum & 0xff) as u8
     }
     /// 8xy0: Loads the value of y into x
@@ -379,22 +470,24 @@ impl CPU {
     /// 8xy4: Performs addition of vX and vY, and stores the result in vX
     #[inline]
     fn x_addequals_y(&mut self, x: Reg, y: Reg) {
-        self.v[x] = self.set_carry(x, y, u16::wrapping_add);
+        self.v[x] = self.set_carry(x, y, u16::wrapping_add, false);
     }
     /// 8xy5: Performs subtraction of vX and vY, and stores the result in vX
     #[inline]
     fn x_subequals_y(&mut self, x: Reg, y: Reg) {
-        self.v[x] = self.set_carry(x, y, u16::wrapping_sub);
+        self.v[x] = self.set_carry(x, y, u16::wrapping_sub, true);
     }
     /// 8xy6: Performs bitwise right shift of vX
     #[inline]
     fn shift_right_x(&mut self, x: Reg) {
+        let shift_out = self.v[x] & 1;
         self.v[x] >>= 1;
+        self.v[0xf] = shift_out;
     }
     /// 8xy7: Performs subtraction of vY and vX, and stores the result in vX
     #[inline]
     fn backwards_subtract(&mut self, x: Reg, y: Reg) {
-        self.v[x] = self.set_carry(y, x, u16::wrapping_sub);
+        self.v[x] = self.set_carry(y, x, u16::wrapping_sub, true);
     }
     /// 8X_E: Performs bitwise left shift of vX
     #[inline]
@@ -421,48 +514,48 @@ impl CPU {
     fn jump_indexed(&mut self, a: Adr) {
         self.pc = a.wrapping_add(self.v[0] as Adr);
     }
-    /// Cxbb: Stores a random number + the provided byte into vX
-    /// Pretty sure the input byte is supposed to be the seed of a LFSR or something
+    /// Cxbb: Stores a random number & the provided byte into vX
     #[inline]
     fn rand(&mut self, x: Reg, b: u8) {
-        // TODO: Random Number Generator
-        todo!("{}", format_args!("rand\t#{b:X}, v{x:x}").red());
+        self.v[x] = random::<u8>() & b;
     }
     /// Dxyn: Draws n-byte sprite to the screen at coordinates (vX, vY)
     #[inline]
-    fn draw<I>(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut I)
-    where
-        I: Read<u8> + Read<u16>
-    {
-        println!("{}", format_args!("draw\t#{n:x}, v{x:x}, v{y:x}").red());
+    fn draw(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut Bus) {
+        // println!("{}", format_args!("draw\t#{n:x}, (x: {:x}, y: {:x})", self.v[x], self.v[y]).green());
+        let (x, y) = (self.v[x], self.v[y]);
         self.v[0xf] = 0;
-        // TODO: Repeat for all N
         for byte in 0..n as u16 {
-            // TODO: Calculate the lower bound address based on the X,Y position on the screen
-            let lower_bound = ((y as u16 + byte) * 8) + x as u16 / 8;
-            // TODO: Read a byte of sprite data into a u16, and shift it x % 8 bits
-            let sprite_line: u8 = bus.read(self.i);
-            // TODO: Read a u16 from the bus containing the two bytes which might need to be updated
-            let screen_word: u16 = bus.read(self.screen + lower_bound);
-            // TODO: Update the screen word by XORing the sprite byte
-            todo!("{sprite_line}, {screen_word}")
+            // Calculate the lower bound address based on the X,Y position on the screen
+            let addr = ((y as u16 + byte) * 8) + (x / 8) as u16 + self.screen;
+            // Read a byte of sprite data into a u16, and shift it x % 8 bits
+            let sprite: u8 = bus.read(self.i + byte);
+            let sprite = (sprite as u16) << 1 + (7 - x % 8);
+            // Read a u16 from the bus containing the two bytes which might need to be updated
+            let mut screen: u16 = bus.read(addr);
+            // Save the bits-toggled-off flag if necessary
+            if screen & sprite != 0 {
+                self.v[0xF] = 1
+            }
+            // Update the screen word by XORing the sprite byte
+            screen ^= sprite;
+            // Save the result back to the screen
+            bus.write(addr, screen);
         }
     }
     /// Ex9E: Skip next instruction if key == #X
     #[inline]
     fn skip_if_key_equals_x(&mut self, x: Reg) {
-        std::println!("{}", format_args!("sek\tv{x:x}"));
-        if self.keys >> x & 1 == 1 {
-            std::println!("KEY == {x}");
+        let x = self.v[x] as usize;
+        if self.keys[x] {
             self.pc += 2;
         }
     }
     /// ExaE: Skip next instruction if key != #X
     #[inline]
     fn skip_if_key_not_x(&mut self, x: Reg) {
-        std::println!("{}", format_args!("snek\tv{x:x}"));
-        if self.keys >> x & 1 == 0 {
-            std::println!("KEY != {x}");
+        let x = self.v[x] as usize;
+        if !self.keys[x] {
             self.pc += 2;
         }
     }
@@ -477,9 +570,17 @@ impl CPU {
     /// Fx0A: Wait for key, then vX = K
     #[inline]
     fn wait_for_key(&mut self, x: Reg) {
-        // TODO: I/O
-
-        std::println!("{}", format_args!("waitk\tv{x:x}").red());
+        let mut pressed = false;
+        for bit in 0..16 {
+            if self.keys[bit] {
+                self.v[x] = bit as u8;
+                pressed = true;
+            }
+        }
+        if !pressed {
+            self.pc = self.pc.wrapping_sub(2);
+            self.flags.keypause = true;
+        }
     }
     /// Fx15: Load vX into DT
     /// ```py
@@ -511,29 +612,46 @@ impl CPU {
     /// ```
     #[inline]
     fn load_sprite_x(&mut self, x: Reg) {
-        self.i = self.font + (5 * x as Adr);
+        self.i = self.font + (5 * (self.v[x] as Adr % 0x10));
     }
     /// Fx33: BCD convert X into I`[0..3]`
     #[inline]
-    fn bcd_convert_i(&mut self, x: Reg, _bus: &mut impl Write<u8>) {
-        // TODO: I/O
-
-        std::println!("{}", format_args!("bcd\t{x:x}, &I").red());
+    fn bcd_convert_i(&mut self, x: Reg, bus: &mut Bus) {
+        let x = self.v[x];
+        bus.write(self.i.wrapping_add(2), x % 10);
+        bus.write(self.i.wrapping_add(1), x / 10 % 10);
+        bus.write(self.i, x / 100 % 10);
     }
     /// Fx55: DMA Stor from I to registers 0..X
     #[inline]
-    fn dma_store(&mut self, x: Reg, bus: &mut impl Write<u8>) {
-        for reg in 0..=x {
-            bus.write(self.i + reg as u16, self.v[reg]);
+    fn dma_store(&mut self, x: Reg, bus: &mut Bus) {
+        let i = self.i as usize;
+        for (reg, value) in bus
+            .get_mut(i..=i + x)
+            .unwrap_or_default()
+            .iter_mut()
+            .enumerate()
+        {
+            *value = self.v[reg]
         }
-        self.i += x as Adr + 1;
+        if self.flags.authentic {
+            self.i += x as Adr + 1;
+        }
     }
     /// Fx65: DMA Load from I to registers 0..X
     #[inline]
-    fn dma_load(&mut self, x: Reg, bus: &mut impl Read<u8>) {
-        for reg in 0..=x {
-            self.v[reg] = bus.read(self.i + reg as u16);
+    fn dma_load(&mut self, x: Reg, bus: &mut Bus) {
+        let i = self.i as usize;
+        for (reg, value) in bus
+            .get(i + 0..=i + x)
+            .unwrap_or_default()
+            .iter()
+            .enumerate()
+        {
+            self.v[reg] = *value;
         }
-        self.i += x as Adr + 1;
+        if self.flags.authentic {
+            self.i += x as Adr + 1;
+        }
     }
 }

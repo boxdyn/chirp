@@ -1,71 +1,154 @@
-use chumpulator::{bus::Read, prelude::*};
+//! Chirp: A chip-8 interpreter in Rust
+//! Hello, world!
+
+use chirp::{error::Result, prelude::*};
+use gumdrop::*;
+use minifb::*;
 use std::fs::read;
-use std::time::{Duration, Instant};
+use std::{
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
-/// What I want:
-/// I want a data bus that stores as much memory as I need to implement a chip 8 emulator
-/// I want that data bus to hold named memory ranges and have a way to get a memory region
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Options, Hash)]
+struct Arguments {
+    #[options(help = "Enable behavior incompatible with modern software")]
+    pub authentic: bool,
+    #[options(
+        help = "Set breakpoints for the emulator to stop at",
+        parse(try_from_str = "parse_hex")
+    )]
+    pub breakpoints: Vec<u16>,
+    #[options(help = "Enable debug mode at startup")]
+    pub debug: bool,
+    #[options(help = "Enable pause mode at startup")]
+    pub pause: bool,
+    #[options(help = "Load a ROM to run on Chirp")]
+    pub file: PathBuf,
+}
 
-fn main() -> Result<(), std::io::Error> {
-    let mut now;
-    println!("Building Bus...");
-    let mut time = Instant::now();
+fn parse_hex(value: &str) -> std::result::Result<u16, std::num::ParseIntError> {
+    u16::from_str_radix(value, 16)
+}
+
+fn main() -> Result<()> {
+    let options = Arguments::parse_args_default_or_exit();
+
+    // Create the data bus
     let mut bus = bus! {
         // Load the charset into ROM
-        "charset" [0x0050..0x00a0] = Mem::new(0x50).load_charset(0).w(false),
+        "charset" [0x0050..0x00A0] = include_bytes!("mem/charset.bin"),
         // Load the ROM file into RAM
-        "userram" [0x0200..0x0F00] = Mem::new(0xF00 - 0x200).load(0, &read("chip-8/Fishie.ch8")?),
-        // Create a screen
-        "screen"  [0x0F00..0x1000] = Mem::new(32*64/8),
-        // Create some stack memory
-        "stack"   [0xF000..0xF800] = Mem::new(0x800).r(true).w(true),
-    };
-    now = time.elapsed();
-    println!("Elapsed: {:?}\nBuilding NewBus...", now);
-    time = Instant::now();
-    let mut newbus = newbus! {
-        // Load the charset into ROM
-        "charset" [0x0050..0x00a0] = include_bytes!("mem/charset.bin"),
-        // Load the ROM file into RAM
-        "userram" [0x0200..0x0F00] = &read("chip-8/Fishie.ch8")?,
+        "userram" [0x0200..0x0F00] = &read(options.file)?,
         // Create a screen
         "screen"  [0x0F00..0x1000],
         // Create some stack memory
-        "stack"   [0x2000..0x2800],
+        //"stack"   [0x2000..0x2100],
     };
-    now = time.elapsed();
-    println!("Elapsed: {:?}", now);
-    println!("{newbus}");
 
-    let disassembler = Disassemble::default();
-    if false {
-        for addr in 0x200..0x290 {
-            if addr % 2 == 0 {
-                println!(
-                    "{addr:03x}: {}",
-                    disassembler.instruction(bus.read(addr as usize))
-                );
+    // let disassembler = Disassemble::default();
+    // if false {
+    //     for addr in 0x200..0x290 {
+    //         if addr % 2 == 0 {
+    //             println!(
+    //                 "{addr:03x}: {}",
+    //                 disassembler.instruction(bus.read(addr as usize))
+    //             );
+    //         }
+    //     }
+    // }
+
+    let mut cpu = CPU::new(0xf00, 0x50, 0x200, 0x20fe, Disassemble::default());
+    for point in options.breakpoints {
+        cpu.set_break(point);
+    }
+    cpu.flags.authentic = options.authentic;
+    cpu.flags.debug = options.debug;
+    cpu.flags.pause = options.pause;
+    let mut framebuffer = FrameBuffer::new(64, 32);
+    let mut window = WindowBuilder::default().build()?;
+    let mut frame_time = Instant::now();
+    let mut step_time = Instant::now();
+
+    framebuffer.render(&mut window, &mut bus);
+
+    cpu.flags.pause = false;
+    cpu.flags.debug = true;
+
+    loop {
+        if !cpu.flags.pause {
+            cpu.tick(&mut bus);
+        }
+        while frame_time.elapsed() > Duration::from_micros(16000) {
+            if cpu.flags.pause {
+                window.set_title("Chirp  ⏸")
+            } else {
+                window.set_title("Chirp  ▶")
+            }
+            frame_time += Duration::from_micros(16000);
+            // tick sound and delay timers
+            cpu.tick_timer();
+            // update framebuffer
+            framebuffer.render(&mut window, &mut bus);
+            // get key input (has to happen after framebuffer)
+            get_keys(&mut window, &mut cpu);
+            // handle keys at the
+            for key in window.get_keys_pressed(KeyRepeat::No) {
+                use Key::*;
+                match key {
+                    F1 => cpu.dump(),
+                    F2 => bus
+                        .print_screen()
+                        .expect("The 'screen' memory region exists"),
+                    F3 => {
+                        println!(
+                            "{}",
+                            endis("Debug", {
+                                cpu.flags.debug();
+                                cpu.flags.debug
+                            })
+                        )
+                    }
+                    F4 => println!(
+                        "{}",
+                        endis("Pause", {
+                            cpu.flags.pause();
+                            cpu.flags.pause
+                        })
+                    ),
+                    F5 => {
+                        println!("Step");
+                        cpu.singlestep(&mut bus)
+                    }
+                    F6 => {
+                        println!("Set breakpoint {:x}", cpu.pc());
+                        cpu.set_break(cpu.pc())
+                    }
+                    F7 => {
+                        println!("Unset breakpoint {:x}", cpu.pc());
+                        cpu.unset_break(cpu.pc())
+                    }
+                    F8 => {
+                        println!("Soft reset CPU {:x}", cpu.pc());
+                        cpu.soft_reset();
+                        bus.clear_region("screen");
+                    }
+                    F9 => {
+                        println!("Hard reset CPU");
+                        cpu = CPU::default();
+                        bus.clear_region("screen");
+                    }
+                    Escape => return Ok(()),
+                    _ => (),
+                }
             }
         }
+        std::thread::sleep(Duration::from_micros(1666).saturating_sub(step_time.elapsed()));
+        step_time = Instant::now();
     }
+    //Ok(())
+}
 
-    let mut cpu = CPU::new(0xf00, 0x50, 0x200, 0xf7fe, disassembler);
-    let mut cpu2 = cpu.clone();
-    println!("Old Bus:");
-    for _instruction in 0..6 {
-        time = Instant::now();
-        cpu.tick(&mut bus);
-        now = time.elapsed();
-        println!("         Elapsed: {:?}", now);
-        std::thread::sleep(Duration::from_micros(2000).saturating_sub(time.elapsed()));
-    }
-    println!("New Bus:");
-    for _instruction in 0..6 {
-        time = Instant::now();
-        cpu2.tick(&mut newbus);
-        now = time.elapsed();
-        println!("         Elapsed: {:?}", now);
-        std::thread::sleep(Duration::from_micros(2000).saturating_sub(time.elapsed()));
-    }
-    Ok(())
+fn endis(name: &str, state: bool) -> String {
+    format!("{name} {}", if state { "enabled" } else { "disabled" })
 }

@@ -1,4 +1,4 @@
-#![feature(let_chains, stmt_expr_attributes)]
+#![feature(stmt_expr_attributes)]
 /*!
 This crate implements a Chip-8 interpreter as if it were a real CPU architecture,
 to the best of my current knowledge. As it's the first emulator project I've
@@ -9,20 +9,17 @@ Hopefully, though, you'll find some use in it.
 
 pub mod bus;
 pub mod cpu;
-pub mod mem;
+pub mod io;
 
 pub mod dump;
 pub mod error;
-pub mod screen;
 
 /// Common imports for chumpulator
 pub mod prelude {
     use super::*;
     pub use crate::bus;
-    pub use crate::newbus;
-    pub use bus::{Bus, BusConnectible, Read, Write};
+    pub use bus::{Bus, Read, Write};
     pub use cpu::{disassemble::Disassemble, CPU};
     pub use dump::{BinDumpable, Dumpable};
-    pub use mem::Mem;
-    pub use screen::Screen;
+    pub use io::{*, WindowBuilder};
 }
