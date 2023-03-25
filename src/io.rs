@@ -1,6 +1,6 @@
 //!
 
-use crate::{bus::Bus, cpu::CPU, error::Result};
+use crate::{bus::{Bus, Region}, cpu::CPU, error::Result};
 use minifb::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -75,7 +75,7 @@ impl FrameBuffer {
         }
     }
     pub fn render(&mut self, window: &mut Window, bus: &Bus) {
-        if let Some(screen) = bus.get_region("screen") {
+        if let Some(screen) = bus.get_region(Region::Screen) {
             for (idx, byte) in screen.iter().enumerate() {
                 for bit in 0..8 {
                     self.buffer[8 * idx + bit] = if byte & (1 << 7 - bit) as u8 != 0 {

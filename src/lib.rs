@@ -9,17 +9,17 @@ Hopefully, though, you'll find some use in it.
 
 pub mod bus;
 pub mod cpu;
+pub mod error;
 pub mod io;
 
 pub mod dump;
-pub mod error;
 
 /// Common imports for chumpulator
 pub mod prelude {
     use super::*;
     pub use crate::bus;
-    pub use bus::{Bus, Read, Write};
     pub use cpu::{disassemble::Disassemble, CPU};
     pub use dump::{BinDumpable, Dumpable};
     pub use io::{*, WindowBuilder};
+    pub use bus::{Bus, Read, Region::*, Write};
 }

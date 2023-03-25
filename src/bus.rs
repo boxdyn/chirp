@@ -11,15 +11,15 @@ use std::{
 /// Creates a new bus, instantiating BusConnectable devices
 /// # Examples
 /// ```rust
-/// # use chumpulator::prelude::*;
+/// # use chirp::prelude::*;
 /// let mut bus = bus! {
-///     "RAM" [0x0000..0x8000],
-///     "ROM" [0x8000..0xFFFF],
+///     Stack   [0x0000..0x0800] = b"ABCDEF",
+///     Program [0x0800..0x1000] = include_bytes!("bus.rs"),
 /// };
 /// ```
 #[macro_export]
 macro_rules! bus {
-    ($($name:literal $(:)? [$range:expr] $(= $data:expr)?) ,* $(,)?) => {
+    ($($name:path $(:)? [$range:expr] $(= $data:expr)?) ,* $(,)?) => {
         $crate::bus::Bus::new()
         $(
             .add_region($name, $range)
@@ -43,14 +43,30 @@ pub trait Write<T> {
     fn write(&mut self, addr: impl Into<usize>, data: T);
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum Region {}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Region {
+    Charset,
+    Program,
+    Screen,
+    Stack,
+}
+
+impl Display for Region {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Region::Charset => "charset",
+            Region::Program => "program",
+            Region::Screen => "screen",
+            Region::Stack => "stack",
+        })
+    }
+}
 
 /// Store memory in a series of named regions with ranges
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Bus {
     memory: Vec<u8>,
-    region: HashMap<&'static str, Range<usize>>,
+    region: HashMap<Region, Range<usize>>,
 }
 
 impl Bus {
@@ -66,25 +82,25 @@ impl Bus {
     pub fn is_empty(&self) -> bool {
         self.memory.is_empty()
     }
-    /// Grows the NewBus backing memory to at least size bytes, but does not truncate
+    /// Grows the Bus backing memory to at least size bytes, but does not truncate
     pub fn with_size(&mut self, size: usize) {
         if self.len() < size {
             self.memory.resize(size, 0);
         }
     }
-    pub fn add_region(mut self, name: &'static str, range: Range<usize>) -> Self {
+    pub fn add_region(mut self, name: Region, range: Range<usize>) -> Self {
         self.with_size(range.end);
         self.region.insert(name, range);
         self
     }
-    pub fn load_region(mut self, name: &str, data: &[u8]) -> Self {
+    pub fn load_region(mut self, name: Region, data: &[u8]) -> Self {
         use std::io::Write;
         if let Some(mut region) = self.get_region_mut(name) {
-            dbg!(region.write(data)).ok(); // TODO: THIS SUCKS
+            region.write(data).ok(); // TODO: THIS SUCKS
         }
         self
     }
-    pub fn clear_region(&mut self, name: &str) -> &mut Self {
+    pub fn clear_region(&mut self, name: Region) -> &mut Self {
         if let Some(region) = self.get_region_mut(name) {
             region.fill(0)
         }
@@ -105,15 +121,15 @@ impl Bus {
         self.memory.get_mut(index)
     }
     /// Gets a slice of a named region of memory
-    pub fn get_region(&self, name: &str) -> Option<&[u8]> {
-        self.get(self.region.get(name)?.clone())
+    pub fn get_region(&self, name: Region) -> Option<&[u8]> {
+        self.get(self.region.get(&name)?.clone())
     }
     /// Gets a mutable slice to a named region of memory
-    pub fn get_region_mut(&mut self, name: &str) -> Option<&mut [u8]> {
-        self.get_mut(self.region.get(name)?.clone())
+    pub fn get_region_mut(&mut self, name: Region) -> Option<&mut [u8]> {
+        self.get_mut(self.region.get(&name)?.clone())
     }
     pub fn print_screen(&self) -> Result<()> {
-        const REGION: &str = "screen";
+        const REGION: Region = Region::Screen;
         if let Some(screen) = self.get_region(REGION) {
             for (index, byte) in screen.iter().enumerate() {
                 if index % 8 == 0 {

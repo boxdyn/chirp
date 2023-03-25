@@ -3,7 +3,7 @@
 pub mod disassemble;
 
 use self::disassemble::Disassemble;
-use crate::bus::{Bus, Read, Write};
+use crate::bus::{Bus, Read, Region, Write};
 use owo_colors::OwoColorize;
 use rand::random;
 use std::time::Instant;
@@ -99,6 +99,7 @@ impl CPU {
     /// ```rust
     /// # use chumpulator::prelude::*;
     /// let mut cpu = CPU::new(0xf00, 0x50, 0x200, 0xefe, Disassemble::default());
+    /// let mut cpu = CPU::new(0xf00, 0x50, 0x200, 0xefe, Disassemble::default(), vec![], ControlFlags::default());
     /// ```
     pub fn new(screen: Adr, font: Adr, pc: Adr, sp: Adr, disassembler: Disassemble) -> Self {
         CPU {
@@ -383,7 +384,7 @@ impl CPU {
     /// 00e0: Clears the screen memory to 0
     #[inline]
     fn clear_screen(&mut self, bus: &mut Bus) {
-        if let Some(screen) = bus.get_region_mut("screen") {
+        if let Some(screen) = bus.get_region_mut(Region::Screen) {
             for byte in screen {
                 *byte = 0;
             }
