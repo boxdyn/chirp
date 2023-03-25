@@ -1,8 +1,8 @@
 //! A disassembler for Chip-8 opcodes
 
-use owo_colors::{OwoColorize, Style};
 
 use super::{Adr, Nib, Reg};
+use owo_colors::{OwoColorize, Style};
 type Ins = Nib;
 
 #[inline]
@@ -216,7 +216,9 @@ impl Disassemble {
     }
     /// `5xy0`: Skips the next instruction if register X != register Y
     pub fn skip_if_x_equal_y(&self, x: Reg, y: Reg) -> String {
-        format!("se     v{x:X}, v{y:X}").style(self.normal).to_string()
+        format!("se     v{x:X}, v{y:X}")
+            .style(self.normal)
+            .to_string()
     }
 
     /// `6xbb`: Loads immediate byte b into register vX
@@ -239,7 +241,9 @@ impl Disassemble {
     }
     /// `8xy1`: Performs bitwise or of vX and vY, and stores the result in vX
     pub fn x_orequals_y(&self, x: Reg, y: Reg) -> String {
-        format!("or     v{y:X}, v{x:X}").style(self.normal).to_string()
+        format!("or     v{y:X}, v{x:X}")
+            .style(self.normal)
+            .to_string()
     }
     /// `8xy2`: Performs bitwise and of vX and vY, and stores the result in vX
     pub fn x_andequals_y(&self, x: Reg, y: Reg) -> String {
@@ -282,7 +286,9 @@ impl Disassemble {
     }
     /// `9xy0`: Skip next instruction if X != y
     pub fn skip_if_x_not_equal_y(&self, x: Reg, y: Reg) -> String {
-        format!("sne    v{x:X}, v{y:X}").style(self.normal).to_string()
+        format!("sne    v{x:X}, v{y:X}")
+            .style(self.normal)
+            .to_string()
     }
     /// Aadr: Load address #adr into register I
     pub fn load_indirect_register(&self, a: Adr) -> String {
