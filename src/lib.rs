@@ -12,12 +12,19 @@ pub mod cpu;
 pub mod error;
 pub mod io;
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Chip8 {
+    pub cpu: cpu::CPU,
+    pub bus: bus::Bus,
+}
 
 /// Common imports for chumpulator
 pub mod prelude {
     use super::*;
+    pub use super::Chip8;
     pub use crate::bus;
-    pub use cpu::{disassemble::Disassemble, CPU};
-    pub use io::{*, WindowBuilder};
     pub use bus::{Bus, Read, Region::*, Write};
+    pub use cpu::{disassemble::Disassemble, ControlFlags, CPU};
+    pub use error::Result;
+    pub use io::{WindowBuilder, *};
 }
