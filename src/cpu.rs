@@ -389,8 +389,6 @@ impl CPU {
                 *byte = 0;
             }
         }
-        //use dump::BinDumpable;
-        //bus.bin_dump(self.screen as usize..self.screen as usize + 0x100);
     }
     /// 00ee: Returns from subroutine
     #[inline]
