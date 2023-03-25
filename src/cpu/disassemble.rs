@@ -1,6 +1,5 @@
 //! A disassembler for Chip-8 opcodes
 
-
 use super::{Adr, Nib, Reg};
 use owo_colors::{OwoColorize, Style};
 type Ins = Nib;

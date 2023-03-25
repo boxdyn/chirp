@@ -340,28 +340,42 @@ impl CPU {
     }
 
     pub fn dump(&self) {
-        let dumpstyle = owo_colors::Style::new().bright_black();
-        let mut dump = format!(
-            "PC: {:04x}, SP: {:04x}, I: {:04x}\n",
-            self.pc, self.sp, self.i
+        //let dumpstyle = owo_colors::Style::new().bright_black();
+        std::println!(
+            "PC: {:04x}, SP: {:04x}, I: {:04x}\n{}DLY: {}, SND: {}, CYC: {:6}",
+            self.pc,
+            self.sp,
+            self.i,
+            self
+                .v
+                .into_iter()
+                .enumerate()
+                .map(|(i, gpr)| {
+                    format!(
+                        "v{i:X}: {gpr:02x} {}",
+                        match i % 4 {
+                            3 => "\n",
+                            _ => "",
+                        }
+                    )
+                })
+                .collect::<String>(),
+            self.delay,
+            self.sound,
+            self.cycle,
         );
-        for (i, gpr) in self.v.into_iter().enumerate() {
-            dump += &format!(
-                "V{i:x}: {:02x} {}",
-                gpr,
-                match i % 4 {
-                    3 => "\n",
-                    _ => "",
-                }
-            )
-        }
-        dump += &format!("DLY: {}, SND: {}", self.delay, self.sound);
-
-        std::println!("{}", dump.style(dumpstyle));
     }
 }
 
 impl Default for CPU {
+    /// Constructs a new CPU with sane defaults and debug mode ON
+    ///
+    /// | value  | default | description
+    /// |--------|---------|------------
+    /// | screen |`0x0f00` | Location of screen memory.
+    /// | font   |`0x0050` | Location of font memory.
+    /// | pc     |`0x0200` | Start location. Generally 0x200 or 0x600.
+    /// | sp     |`0x0efe` | Initial top of stack.
     fn default() -> Self {
         CPU {
             screen: 0xf00,
