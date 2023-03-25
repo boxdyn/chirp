@@ -19,7 +19,7 @@ impl WindowBuilder {
             ..Default::default()
         }
     }
-    pub fn build(self) -> Result<Window> {
+    pub fn build(&self) -> Result<Window> {
         Ok(Window::new(
             self.name.unwrap_or_default(),
             self.width,
@@ -47,17 +47,22 @@ impl Default for WindowBuilder {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FrameBufferFormat {
     pub fg: u32,
-    pub bg: u32
+    pub bg: u32,
 }
 
 impl Default for FrameBufferFormat {
     fn default() -> Self {
-        FrameBufferFormat { fg: 0x0011a434, bg: 0x001E2431 }
+        FrameBufferFormat {
+            fg: 0x0011a434,
+            bg: 0x001E2431,
+        }
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FrameBuffer {
     buffer: Vec<u32>,
     width: usize,
@@ -90,6 +95,12 @@ impl FrameBuffer {
         window
             .update_with_buffer(&self.buffer, self.width, self.height)
             .expect("The window manager has encountered an issue I don't want to deal with");
+    }
+}
+
+impl Default for FrameBuffer {
+    fn default() -> Self {
+        Self::new(64, 32)
     }
 }
 
