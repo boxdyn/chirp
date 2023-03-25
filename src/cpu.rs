@@ -304,7 +304,6 @@ impl CPU {
                 _ => self.unimplemented(opcode),
             },
             _ => unimplemented!("Extracted nibble from byte, got >nibble?"),
-            
         }
         let elapsed = time.elapsed();
         // Print opcode disassembly:
@@ -370,7 +369,12 @@ impl Default for CPU {
     }
 }
 
-// private implementation
+// | 0aaa | Issues a "System call" (ML routine)
+//
+// |opcode| effect                             |
+// |------|------------------------------------|
+// | 00e0 | Clear screen memory to all 0       |
+// | 00ee | Return from subroutine             |
 impl CPU {
     /// Unused instructions
     #[inline]
@@ -397,11 +401,23 @@ impl CPU {
         self.sp = self.sp.wrapping_add(2);
         self.pc = bus.read(self.sp);
     }
+}
+
+// | 1aaa | Sets pc to an absolute address
+impl CPU {
     /// 1aaa: Sets the program counter to an absolute address
     #[inline]
     fn jump(&mut self, a: Adr) {
+        // jump to self == halt
+        if a.wrapping_add(2) == self.pc {
+            self.flags.pause = true;
+        }
         self.pc = a;
     }
+}
+
+// | 2aaa | Pushes pc onto the stack, then jumps to a
+impl CPU {
     /// 2aaa: Pushes pc onto the stack, then jumps to a
     #[inline]
     fn call(&mut self, a: Adr, bus: &mut impl Write<u16>) {
@@ -409,6 +425,10 @@ impl CPU {
         self.sp = self.sp.wrapping_sub(2);
         self.pc = a;
     }
+}
+
+// | 3xbb | Skips next instruction if register X == b
+impl CPU {
     /// 3xbb: Skips the next instruction if register X == b
     #[inline]
     fn skip_if_x_equal_byte(&mut self, x: Reg, b: u8) {
@@ -416,6 +436,10 @@ impl CPU {
             self.pc = self.pc.wrapping_add(2);
         }
     }
+}
+
+// | 4xbb | Skips next instruction if register X != b
+impl CPU {
     /// 4xbb: Skips the next instruction if register X != b
     #[inline]
     fn skip_if_x_not_equal_byte(&mut self, x: Reg, b: u8) {
@@ -423,6 +447,14 @@ impl CPU {
             self.pc = self.pc.wrapping_add(2);
         }
     }
+}
+
+// | 5xyn | Performs a register-register comparison
+//
+// |opcode| effect                             |
+// |------|------------------------------------|
+// | 5XY0 | Skip next instruction if vX == vY  |
+impl CPU {
     /// 5xy0: Skips the next instruction if register X != register Y
     #[inline]
     fn skip_if_x_equal_y(&mut self, x: Reg, y: Reg) {
@@ -430,52 +462,85 @@ impl CPU {
             self.pc = self.pc.wrapping_add(2);
         }
     }
+}
+
+// | 6xbb | Loads immediate byte b into register vX
+impl CPU {
     /// 6xbb: Loads immediate byte b into register vX
     #[inline]
     fn load_immediate(&mut self, x: Reg, b: u8) {
         self.v[x] = b;
     }
+}
+
+// | 7xbb | Adds immediate byte b to register vX
+impl CPU {
     /// 7xbb: Adds immediate byte b to register vX
     #[inline]
     fn add_immediate(&mut self, x: Reg, b: u8) {
         self.v[x] = self.v[x].wrapping_add(b);
     }
-    /// Set the carry register (vF) after math
-    #[inline]
-    fn set_carry(&mut self, x: Reg, y: Reg, f: fn(u16, u16) -> u16, inv: bool) -> u8 {
-        let sum = f(self.v[x] as u16, self.v[y] as u16);
-        self.v[0xf] = if (sum & 0xff00 != 0) ^ inv { 1 } else { 0 };
-        (sum & 0xff) as u8
-    }
+}
+
+// | 8xyn | Performs ALU operation
+//
+// |opcode| effect                             |
+// |------|------------------------------------|
+// | 8xy0 | Y = X                              |
+// | 8xy1 | X = X | Y                          |
+// | 8xy2 | X = X & Y                          |
+// | 8xy3 | X = X ^ Y                          |
+// | 8xy4 | X = X + Y; Set vF=carry            |
+// | 8xy5 | X = X - Y; Set vF=carry            |
+// | 8xy6 | X = X >> 1                         |
+// | 8xy7 | X = Y - X; Set vF=carry            |
+// | 8xyE | X = X << 1                         |
+impl CPU {
     /// 8xy0: Loads the value of y into x
     #[inline]
     fn load_y_into_x(&mut self, x: Reg, y: Reg) {
         self.v[x] = self.v[y];
+        if self.flags.authentic {
+            self.v[0xf] = 0;
+        }
     }
     /// 8xy1: Performs bitwise or of vX and vY, and stores the result in vX
     #[inline]
     fn x_orequals_y(&mut self, x: Reg, y: Reg) {
         self.v[x] |= self.v[y];
+        if self.flags.authentic {
+            self.v[0xf] = 0;
+        }
     }
     /// 8xy2: Performs bitwise and of vX and vY, and stores the result in vX
     #[inline]
     fn x_andequals_y(&mut self, x: Reg, y: Reg) {
         self.v[x] &= self.v[y];
+        if self.flags.authentic {
+            self.v[0xf] = 0;
+        }
     }
     /// 8xy3: Performs bitwise xor of vX and vY, and stores the result in vX
     #[inline]
     fn x_xorequals_y(&mut self, x: Reg, y: Reg) {
         self.v[x] ^= self.v[y];
+        if self.flags.authentic {
+            self.v[0xf] = 0;
+        }
     }
     /// 8xy4: Performs addition of vX and vY, and stores the result in vX
     #[inline]
     fn x_addequals_y(&mut self, x: Reg, y: Reg) {
-        self.v[x] = self.set_carry(x, y, u16::wrapping_add, false);
+        let carry;
+        (self.v[x], carry) = self.v[x].overflowing_add(self.v[y]);
+        self.v[0xf] = carry.into();
     }
     /// 8xy5: Performs subtraction of vX and vY, and stores the result in vX
     #[inline]
     fn x_subequals_y(&mut self, x: Reg, y: Reg) {
-        self.v[x] = self.set_carry(x, y, u16::wrapping_sub, true);
+        let carry;
+        (self.v[x], carry) = self.v[x].overflowing_sub(self.v[y]);
+        self.v[0xf] = (!carry).into();
     }
     /// 8xy6: Performs bitwise right shift of vX
     #[inline]
@@ -487,7 +552,9 @@ impl CPU {
     /// 8xy7: Performs subtraction of vY and vX, and stores the result in vX
     #[inline]
     fn backwards_subtract(&mut self, x: Reg, y: Reg) {
-        self.v[x] = self.set_carry(y, x, u16::wrapping_sub, true);
+        let carry;
+        (self.v[x], carry) = self.v[y].overflowing_sub(self.v[x]);
+        self.v[0xf] = (!carry).into();
     }
     /// 8X_E: Performs bitwise left shift of vX
     #[inline]
@@ -496,7 +563,14 @@ impl CPU {
         self.v[x] <<= 1;
         self.v[0xf] = shift_out;
     }
+}
 
+// | 9xyn | Performs a register-register comparison
+//
+// |opcode| effect                             |
+// |------|------------------------------------|
+// | 9XY0 | Skip next instruction if vX != vY  |
+impl CPU {
     /// 9xy0: Skip next instruction if X != y
     #[inline]
     fn skip_if_x_not_equal_y(&mut self, x: Reg, y: Reg) {
@@ -504,33 +578,51 @@ impl CPU {
             self.pc = self.pc.wrapping_add(2);
         }
     }
+}
+
+// | Aaaa | Load address #a into register I
+impl CPU {
     /// Aadr: Load address #adr into register I
     #[inline]
     fn load_indirect_register(&mut self, a: Adr) {
         self.i = a;
     }
+}
+
+// | Baaa | Jump to &adr + v0
+impl CPU {
     /// Badr: Jump to &adr + v0
     #[inline]
     fn jump_indexed(&mut self, a: Adr) {
         self.pc = a.wrapping_add(self.v[0] as Adr);
     }
+}
+
+// | Cxbb | Stores a random number + the provided byte into vX
+impl CPU {
     /// Cxbb: Stores a random number & the provided byte into vX
     #[inline]
     fn rand(&mut self, x: Reg, b: u8) {
         self.v[x] = random::<u8>() & b;
     }
+}
+
+// | Dxyn | Draws n-byte sprite to the screen at coordinates (vX, vY)
+impl CPU {
     /// Dxyn: Draws n-byte sprite to the screen at coordinates (vX, vY)
     #[inline]
     fn draw(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut Bus) {
-        // println!("{}", format_args!("draw\t#{n:x}, (x: {:x}, y: {:x})", self.v[x], self.v[y]).green());
-        let (x, y) = (self.v[x], self.v[y]);
+        let (x, y) = (self.v[x] as u16, self.v[y] as u16);
         self.v[0xf] = 0;
         for byte in 0..n as u16 {
+            if y + byte > 32 {
+                return;
+            }
             // Calculate the lower bound address based on the X,Y position on the screen
-            let addr = ((y as u16 + byte) * 8) + (x / 8) as u16 + self.screen;
+            let addr = (y + byte) * 8 + (x & 0x3f) / 8 + self.screen;
             // Read a byte of sprite data into a u16, and shift it x % 8 bits
             let sprite: u8 = bus.read(self.i + byte);
-            let sprite = (sprite as u16) << 1 + (7 - x % 8);
+            let sprite = (sprite as u16) << 8 - (x & 7) & if x % 64 > 56 { 0xff00 } else { 0xffff };
             // Read a u16 from the bus containing the two bytes which might need to be updated
             let mut screen: u16 = bus.read(addr);
             // Save the bits-toggled-off flag if necessary
@@ -539,10 +631,19 @@ impl CPU {
             }
             // Update the screen word by XORing the sprite byte
             screen ^= sprite;
-            // Save the result back to the screen
+            // Save the result to the screen
             bus.write(addr, screen);
         }
     }
+}
+
+// | Exbb | Skips instruction on value of keypress
+//
+// |opcode| effect                             |
+// |------|------------------------------------|
+// | eX9e | Skip next instruction if key == #X |
+// | eXa1 | Skip next instruction if key != #X |
+impl CPU {
     /// Ex9E: Skip next instruction if key == #X
     #[inline]
     fn skip_if_key_equals_x(&mut self, x: Reg) {
@@ -559,6 +660,22 @@ impl CPU {
             self.pc += 2;
         }
     }
+}
+
+// | Fxbb | Performs IO
+//
+// |opcode| effect                             |
+// |------|------------------------------------|
+// | fX07 | Set vX to value in delay timer     |
+// | fX0a | Wait for input, store in vX m      |
+// | fX15 | Set sound timer to the value in vX |
+// | fX18 | set delay timer to the value in vX |
+// | fX1e | Add x to I                         |
+// | fX29 | Load sprite for character x into I |
+// | fX33 | BCD convert X into I[0..3]         |
+// | fX55 | DMA Stor from I to registers 0..X  |
+// | fX65 | DMA Load from I to registers 0..X  |
+impl CPU {
     /// Fx07: Get the current DT, and put it in vX
     /// ```py
     /// vX = DT
