@@ -1,5 +1,8 @@
 //! Decodes and runs instructions
 
+#[cfg(test)]
+mod tests;
+
 pub mod disassemble;
 
 use self::disassemble::Disassemble;
@@ -158,7 +161,19 @@ impl CPU {
     /// NOTE: does not synchronize with delay timers
     pub fn singlestep(&mut self, bus: &mut Bus) -> &mut Self {
         self.flags.pause = false;
+        self.tick(bus);
+        self.flags.pause = true;
+        self
+    }
+    /// Unpauses the emulator for `steps` ticks
+    /// Ticks the timers every `rate` ticks
+    pub fn multistep(&mut self, bus: &mut Bus, steps: usize, rate: usize) -> &mut Self {
+        for _ in 0..steps {
             self.tick(bus);
+            if rate != 0 && self.cycle % rate == rate - 1 {
+                self.tick_timer();
+            }
+        }
         self
     }
 
