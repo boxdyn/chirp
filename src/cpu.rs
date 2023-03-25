@@ -1,4 +1,4 @@
-//! The CPU decodes and runs instructions
+//! Decodes and runs instructions
 
 pub mod disassemble;
 
@@ -74,10 +74,10 @@ impl CPU {
     /// Set a general purpose register in the CPU
     /// # Examples
     /// ```rust
-    /// # use chumpulator::prelude::*;
+    /// # use chirp::prelude::*;
     /// // Create a new CPU, and set v4 to 0x41
-    /// let cpu = CPU::default()
-    ///     .set_gpr(0x4, 0x41);
+    /// let mut cpu = CPU::default();
+    /// cpu.set_gpr(0x4, 0x41);
     /// // Dump the CPU registers
     /// cpu.dump();
     /// ```
@@ -87,21 +87,21 @@ impl CPU {
         }
     }
 
-    /// Constructs a new CPU with sane defaults
-    ///
-    /// | value  | default | description
-    /// |--------|---------|------------
-    /// | screen | 0x0f00  | Location of screen memory.
-    /// | font   | 0x0050  | Location of font memory.
-    /// | pc     | 0x0200  | Start location. Generally 0x200 or 0x600.
-    /// | sp     | 0x0efe  | Initial top of stack.
+    /// Constructs a new CPU, taking all configurable parameters
     /// # Examples
     /// ```rust
-    /// # use chumpulator::prelude::*;
-    /// let mut cpu = CPU::new(0xf00, 0x50, 0x200, 0xefe, Disassemble::default());
+    /// # use chirp::prelude::*;
     /// let mut cpu = CPU::new(0xf00, 0x50, 0x200, 0xefe, Disassemble::default(), vec![], ControlFlags::default());
     /// ```
-    pub fn new(screen: Adr, font: Adr, pc: Adr, sp: Adr, disassembler: Disassemble) -> Self {
+    pub fn new(
+        screen: Adr,
+        font: Adr,
+        pc: Adr,
+        sp: Adr,
+        disassembler: Disassemble,
+        breakpoints: Vec<Adr>,
+        flags: ControlFlags,
+    ) -> Self {
         CPU {
             disassembler,
             screen,
@@ -114,11 +114,8 @@ impl CPU {
             sound: 0,
             cycle: 0,
             keys: [false; 16],
-            breakpoints: vec![],
-            flags: ControlFlags {
-                debug: true,
-                ..Default::default()
-            },
+            breakpoints,
+            flags,
         }
     }
 
@@ -134,14 +131,15 @@ impl CPU {
     }
 
     /// Set a breakpoint
-    pub fn set_break(&mut self, point: Adr) {
+    pub fn set_break(&mut self, point: Adr) -> &mut Self {
         if !self.breakpoints.contains(&point) {
             self.breakpoints.push(point)
         }
+        self
     }
 
     /// Unset a breakpoint
-    pub fn unset_break(&mut self, point: Adr) {
+    pub fn unset_break(&mut self, point: Adr) -> &mut Self {
         fn linear_find(needle: Adr, haystack: &Vec<Adr>) -> Option<usize> {
             for (i, v) in haystack.iter().enumerate() {
                 if *v == needle {
@@ -153,30 +151,32 @@ impl CPU {
         if let Some(idx) = linear_find(point, &self.breakpoints) {
             assert_eq!(point, self.breakpoints.swap_remove(idx));
         }
+        self
     }
 
     /// Unpauses the emulator for a single tick
     /// NOTE: does not synchronize with delay timers
-    pub fn singlestep(&mut self, bus: &mut Bus) {
-            self.flags.pause = false;
+    pub fn singlestep(&mut self, bus: &mut Bus) -> &mut Self {
+        self.flags.pause = false;
             self.tick(bus);
-            self.flags.pause = true;
+        self
     }
 
     /// Ticks the delay and sound timers
-    pub fn tick_timer(&mut self) {
+    pub fn tick_timer(&mut self) -> &mut Self {
         if self.flags.pause {
-            return;
+            return self;
         }
         self.delay = self.delay.saturating_sub(1);
         self.sound = self.sound.saturating_sub(1);
+        self
     }
 
     /// Runs a single instruction
-    pub fn tick(&mut self, bus: &mut Bus) {
+    pub fn tick(&mut self, bus: &mut Bus) -> &mut Self {
         // Do nothing if paused
         if self.flags.pause || self.flags.keypause {
-            return;
+            return self;
         }
         let time = Instant::now();
         // fetch opcode
@@ -322,6 +322,7 @@ impl CPU {
         if self.breakpoints.contains(&self.pc) {
             self.flags.pause = true;
         }
+        self
     }
 
     pub fn dump(&self) {
