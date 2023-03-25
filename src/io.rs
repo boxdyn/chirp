@@ -134,3 +134,11 @@ pub fn get_keys(window: &mut Window, cpu: &mut CPU) {
         .iter()
         .for_each(|key| cpu.press(identify_key(*key)));
 }
+
+pub fn debug_dump_screen(bus: &Bus) -> Result<()> {
+    Ok(std::fs::write(
+        "screen_dump.bin",
+        bus.get_region(Region::Screen)
+            .expect("Screen should exist, but does not"),
+    )?)
+}
