@@ -12,23 +12,30 @@ use std::{
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Options, Hash)]
 struct Arguments {
+    #[options(help = "Print help text and exit")]
+    help: bool,
     #[options(help = "Enable behavior incompatible with modern software")]
     pub authentic: bool,
     #[options(
+        long = "break",
         help = "Set breakpoints for the emulator to stop at",
         parse(try_from_str = "parse_hex")
     )]
     pub breakpoints: Vec<u16>,
     #[options(help = "Enable debug mode at startup")]
     pub debug: bool,
-    #[options(help = "Enable pause mode at startup")]
+    #[options(help = "Enable pause mode at startup", default = "false")]
     pub pause: bool,
-    #[options(help = "Load a ROM to run on Chirp")]
+    #[options(help = "Load a ROM to run on Chirp", required, free)]
     pub file: PathBuf,
+    #[options(help = "Set the target framerate", default = "60")]
+    pub frame_rate: u64,
+    #[options(help = "Set the instructions-per-frame rate", default = "8")]
+    pub speed: usize,
+    #[options(help = "Run the emulator as fast as possible for `step` instructions")]
+    pub step: Option<usize>,
 }
 
-fn parse_hex(value: &str) -> std::result::Result<u16, std::num::ParseIntError> {
-    u16::from_str_radix(value, 16)
 }
 
 fn main() -> Result<()> {
@@ -45,18 +52,6 @@ fn main() -> Result<()> {
         // Create some stack memory
         //"stack"   [0x2000..0x2100],
     };
-
-    // let disassembler = Disassemble::default();
-    // if false {
-    //     for addr in 0x200..0x290 {
-    //         if addr % 2 == 0 {
-    //             println!(
-    //                 "{addr:03x}: {}",
-    //                 disassembler.instruction(bus.read(addr as usize))
-    //             );
-    //         }
-    //     }
-    // }
 
     let mut cpu = CPU::new(0xf00, 0x50, 0x200, 0x20fe, Disassemble::default());
     for point in options.breakpoints {
@@ -147,8 +142,12 @@ fn main() -> Result<()> {
         step_time = Instant::now();
     }
     //Ok(())
+/// Parses a hexadecimal string into a u16
+fn parse_hex(value: &str) -> std::result::Result<u16, std::num::ParseIntError> {
+    u16::from_str_radix(value, 16)
 }
 
+/// Transforms a bool into "enabled"/"disabled"
 fn endis(name: &str, state: bool) -> String {
     format!("{name} {}", if state { "enabled" } else { "disabled" })
 }
