@@ -227,15 +227,15 @@ impl CPU {
             // | 2aaa | Pushes pc onto the stack, then jumps to a
             0x2 => self.call(a, bus),
             // | 3xbb | Skips next instruction if register X == b
-            0x3 => self.skip_if_x_equal_byte(x, b),
+            0x3 => self.skip_equals_immediate(x, b),
             // | 4xbb | Skips next instruction if register X != b
-            0x4 => self.skip_if_x_not_equal_byte(x, b),
+            0x4 => self.skip_not_equals_immediate(x, b),
             // # Performs a register-register comparison
             // |opcode| effect                             |
             // |------|------------------------------------|
             // | 9XY0 | Skip next instruction if vX == vY  |
             0x5 => match n {
-                0x0 => self.skip_if_x_equal_y(x, y),
+                0x0 => self.skip_equals(x, y),
                 _ => self.unimplemented(opcode),
             },
             // 6xbb: Loads immediate byte b into register vX
@@ -255,15 +255,15 @@ impl CPU {
             // | 8xy7 | X = Y - X; Set vF=carry            |
             // | 8xyE | X = X << 1                         |
             0x8 => match n {
-                0x0 => self.load_y_into_x(x, y),
-                0x1 => self.x_orequals_y(x, y),
-                0x2 => self.x_andequals_y(x, y),
-                0x3 => self.x_xorequals_y(x, y),
-                0x4 => self.x_addequals_y(x, y),
-                0x5 => self.x_subequals_y(x, y),
-                0x6 => self.shift_right_x(x),
-                0x7 => self.backwards_subtract(x, y),
-                0xE => self.shift_left_x(x),
+                0x0 => self.load(x, y),
+                0x1 => self.or(x, y),
+                0x2 => self.and(x, y),
+                0x3 => self.xor(x, y),
+                0x4 => self.add(x, y),
+                0x5 => self.sub(x, y),
+                0x6 => self.shift_right(x, y),
+                0x7 => self.backwards_sub(x, y),
+                0xE => self.shift_left(x, y),
                 _ => self.unimplemented(opcode),
             },
             // # Performs a register-register comparison
@@ -271,11 +271,11 @@ impl CPU {
             // |------|------------------------------------|
             // | 9XY0 | Skip next instruction if vX != vY  |
             0x9 => match n {
-                0 => self.skip_if_x_not_equal_y(x, y),
+                0 => self.skip_not_equals(x, y),
                 _ => self.unimplemented(opcode),
             },
             // Aaaa: Load address #a into register I
-            0xa => self.load_indirect_register(a),
+            0xa => self.load_i_immediate(a),
             // Baaa: Jump to &adr + v0
             0xb => self.jump_indexed(a),
             // Cxbb: Stores a random number + the provided byte into vX
@@ -286,11 +286,11 @@ impl CPU {
             // # Skips instruction on value of keypress
             // |opcode| effect                             |
             // |------|------------------------------------|
-            // | eX9e | Skip next instruction if key == #X |
-            // | eXa1 | Skip next instruction if key != #X |
+            // | eX9e | Skip next instruction if key == vX |
+            // | eXa1 | Skip next instruction if key != vX |
             0xe => match b {
-                0x9e => self.skip_if_key_equals_x(x),
-                0xa1 => self.skip_if_key_not_x(x),
+                0x9e => self.skip_key_equals(x),
+                0xa1 => self.skip_key_not_equals(x),
                 _ => self.unimplemented(opcode),
             },
 
@@ -307,15 +307,15 @@ impl CPU {
             // | fX55 | DMA Stor from I to registers 0..X  |
             // | fX65 | DMA Load from I to registers 0..X  |
             0xf => match b {
-                0x07 => self.get_delay_timer(x),
+                0x07 => self.load_delay_timer(x),
                 0x0A => self.wait_for_key(x),
-                0x15 => self.load_delay_timer(x),
-                0x18 => self.load_sound_timer(x),
-                0x1E => self.add_to_indirect(x),
-                0x29 => self.load_sprite_x(x),
-                0x33 => self.bcd_convert_i(x, bus),
-                0x55 => self.dma_store(x, bus),
-                0x65 => self.dma_load(x, bus),
+                0x15 => self.store_delay_timer(x),
+                0x18 => self.store_sound_timer(x),
+                0x1E => self.add_i(x),
+                0x29 => self.load_sprite(x),
+                0x33 => self.bcd_convert(x, bus),
+                0x55 => self.store_dma(x, bus),
+                0x65 => self.load_dma(x, bus),
                 _ => self.unimplemented(opcode),
             },
             _ => unimplemented!("Extracted nibble from byte, got >nibble?"),
@@ -398,6 +398,9 @@ impl Default for CPU {
     }
 }
 
+// Below this point, comments may be duplicated per impl' block, 
+// since some opcodes handle multiple instructions.
+
 // | 0aaa | Issues a "System call" (ML routine)
 //
 // |opcode| effect                             |
@@ -460,7 +463,7 @@ impl CPU {
 impl CPU {
     /// 3xbb: Skips the next instruction if register X == b
     #[inline]
-    fn skip_if_x_equal_byte(&mut self, x: Reg, b: u8) {
+    fn skip_equals_immediate(&mut self, x: Reg, b: u8) {
         if self.v[x] == b {
             self.pc = self.pc.wrapping_add(2);
         }
@@ -471,7 +474,7 @@ impl CPU {
 impl CPU {
     /// 4xbb: Skips the next instruction if register X != b
     #[inline]
-    fn skip_if_x_not_equal_byte(&mut self, x: Reg, b: u8) {
+    fn skip_not_equals_immediate(&mut self, x: Reg, b: u8) {
         if self.v[x] != b {
             self.pc = self.pc.wrapping_add(2);
         }
@@ -486,7 +489,7 @@ impl CPU {
 impl CPU {
     /// 5xy0: Skips the next instruction if register X != register Y
     #[inline]
-    fn skip_if_x_equal_y(&mut self, x: Reg, y: Reg) {
+    fn skip_equals(&mut self, x: Reg, y: Reg) {
         if self.v[x] == self.v[y] {
             self.pc = self.pc.wrapping_add(2);
         }
@@ -526,32 +529,44 @@ impl CPU {
 // | 8xyE | X = X << 1                         |
 impl CPU {
     /// 8xy0: Loads the value of y into x
+    /// 
+    /// # Authenticity
+    /// The original chip-8 interpreter will clobber vF for any 8-series instruction
     #[inline]
-    fn load_y_into_x(&mut self, x: Reg, y: Reg) {
+    fn load(&mut self, x: Reg, y: Reg) {
         self.v[x] = self.v[y];
         if self.flags.authentic {
             self.v[0xf] = 0;
         }
     }
     /// 8xy1: Performs bitwise or of vX and vY, and stores the result in vX
+    /// 
+    /// # Authenticity
+    /// The original chip-8 interpreter will clobber vF for any 8-series instruction
     #[inline]
-    fn x_orequals_y(&mut self, x: Reg, y: Reg) {
+    fn or(&mut self, x: Reg, y: Reg) {
         self.v[x] |= self.v[y];
         if self.flags.authentic {
             self.v[0xf] = 0;
         }
     }
     /// 8xy2: Performs bitwise and of vX and vY, and stores the result in vX
+    /// 
+    /// # Authenticity
+    /// The original chip-8 interpreter will clobber vF for any 8-series instruction
     #[inline]
-    fn x_andequals_y(&mut self, x: Reg, y: Reg) {
+    fn and(&mut self, x: Reg, y: Reg) {
         self.v[x] &= self.v[y];
         if self.flags.authentic {
             self.v[0xf] = 0;
         }
     }
     /// 8xy3: Performs bitwise xor of vX and vY, and stores the result in vX
+    /// 
+    /// # Authenticity
+    /// The original chip-8 interpreter will clobber vF for any 8-series instruction
     #[inline]
-    fn x_xorequals_y(&mut self, x: Reg, y: Reg) {
+    fn xor(&mut self, x: Reg, y: Reg) {
         self.v[x] ^= self.v[y];
         if self.flags.authentic {
             self.v[0xf] = 0;
@@ -559,37 +574,47 @@ impl CPU {
     }
     /// 8xy4: Performs addition of vX and vY, and stores the result in vX
     #[inline]
-    fn x_addequals_y(&mut self, x: Reg, y: Reg) {
+    fn add(&mut self, x: Reg, y: Reg) {
         let carry;
         (self.v[x], carry) = self.v[x].overflowing_add(self.v[y]);
         self.v[0xf] = carry.into();
     }
     /// 8xy5: Performs subtraction of vX and vY, and stores the result in vX
     #[inline]
-    fn x_subequals_y(&mut self, x: Reg, y: Reg) {
+    fn sub(&mut self, x: Reg, y: Reg) {
         let carry;
         (self.v[x], carry) = self.v[x].overflowing_sub(self.v[y]);
         self.v[0xf] = (!carry).into();
     }
     /// 8xy6: Performs bitwise right shift of vX
+    /// 
+    /// # Authenticity
+    /// On the original chip-8 interpreter, this would perform the operation on vY
+    /// and store the result in vX. This behavior was left out, for now.
     #[inline]
-    fn shift_right_x(&mut self, x: Reg) {
-        let shift_out = self.v[x] & 1;
-        self.v[x] >>= 1;
+    fn shift_right(&mut self, x: Reg, y: Reg) {
+        let src: Reg = if self.flags.authentic {y} else {x};
+        let shift_out = self.v[src] & 1;
+        self.v[x] = self.v[src] >> 1;
         self.v[0xf] = shift_out;
     }
     /// 8xy7: Performs subtraction of vY and vX, and stores the result in vX
     #[inline]
-    fn backwards_subtract(&mut self, x: Reg, y: Reg) {
+    fn backwards_sub(&mut self, x: Reg, y: Reg) {
         let carry;
         (self.v[x], carry) = self.v[y].overflowing_sub(self.v[x]);
         self.v[0xf] = (!carry).into();
     }
     /// 8X_E: Performs bitwise left shift of vX
+    /// 
+    /// # Authenticity
+    /// On the original chip-8 interpreter, this would perform the operation on vY
+    /// and store the result in vX. This behavior was left out, for now.
     #[inline]
-    fn shift_left_x(&mut self, x: Reg) {
-        let shift_out: u8 = self.v[x] >> 7;
-        self.v[x] <<= 1;
+    fn shift_left(&mut self, x: Reg, y: Reg) {
+        let src: Reg = if self.flags.authentic {y} else {x};
+        let shift_out: u8 = self.v[src] >> 7;
+        self.v[x] = self.v[src] << 1;
         self.v[0xf] = shift_out;
     }
 }
@@ -602,7 +627,7 @@ impl CPU {
 impl CPU {
     /// 9xy0: Skip next instruction if X != y
     #[inline]
-    fn skip_if_x_not_equal_y(&mut self, x: Reg, y: Reg) {
+    fn skip_not_equals(&mut self, x: Reg, y: Reg) {
         if self.v[x] != self.v[y] {
             self.pc = self.pc.wrapping_add(2);
         }
@@ -613,7 +638,7 @@ impl CPU {
 impl CPU {
     /// Aadr: Load address #adr into register I
     #[inline]
-    fn load_indirect_register(&mut self, a: Adr) {
+    fn load_i_immediate(&mut self, a: Adr) {
         self.i = a;
     }
 }
@@ -675,7 +700,7 @@ impl CPU {
 impl CPU {
     /// Ex9E: Skip next instruction if key == #X
     #[inline]
-    fn skip_if_key_equals_x(&mut self, x: Reg) {
+    fn skip_key_equals(&mut self, x: Reg) {
         let x = self.v[x] as usize;
         if self.keys[x] {
             self.pc += 2;
@@ -683,7 +708,7 @@ impl CPU {
     }
     /// ExaE: Skip next instruction if key != #X
     #[inline]
-    fn skip_if_key_not_x(&mut self, x: Reg) {
+    fn skip_key_not_equals(&mut self, x: Reg) {
         let x = self.v[x] as usize;
         if !self.keys[x] {
             self.pc += 2;
@@ -710,7 +735,7 @@ impl CPU {
     /// vX = DT
     /// ```
     #[inline]
-    fn get_delay_timer(&mut self, x: Reg) {
+    fn load_delay_timer(&mut self, x: Reg) {
         self.v[x] = self.delay;
     }
     /// Fx0A: Wait for key, then vX = K
@@ -733,7 +758,7 @@ impl CPU {
     /// DT = vX
     /// ```
     #[inline]
-    fn load_delay_timer(&mut self, x: Reg) {
+    fn store_delay_timer(&mut self, x: Reg) {
         self.delay = self.v[x];
     }
     /// Fx18: Load vX into ST
@@ -741,7 +766,7 @@ impl CPU {
     /// ST = vX;
     /// ```
     #[inline]
-    fn load_sound_timer(&mut self, x: Reg) {
+    fn store_sound_timer(&mut self, x: Reg) {
         self.sound = self.v[x];
     }
     /// Fx1e: Add vX to I,
@@ -749,7 +774,7 @@ impl CPU {
     /// I += vX;
     /// ```
     #[inline]
-    fn add_to_indirect(&mut self, x: Reg) {
+    fn add_i(&mut self, x: Reg) {
         self.i += self.v[x] as u16;
     }
     /// Fx29: Load sprite for character x into I
@@ -757,20 +782,24 @@ impl CPU {
     /// I = sprite(X);
     /// ```
     #[inline]
-    fn load_sprite_x(&mut self, x: Reg) {
+    fn load_sprite(&mut self, x: Reg) {
         self.i = self.font + (5 * (self.v[x] as Adr % 0x10));
     }
     /// Fx33: BCD convert X into I`[0..3]`
     #[inline]
-    fn bcd_convert_i(&mut self, x: Reg, bus: &mut Bus) {
+    fn bcd_convert(&mut self, x: Reg, bus: &mut Bus) {
         let x = self.v[x];
         bus.write(self.i.wrapping_add(2), x % 10);
         bus.write(self.i.wrapping_add(1), x / 10 % 10);
         bus.write(self.i, x / 100 % 10);
     }
     /// Fx55: DMA Stor from I to registers 0..X
+    /// 
+    /// # Authenticity
+    /// The original chip-8 interpreter uses I to directly index memory,
+    /// with the side effect of leaving I as I+X+1 after the transfer is done.
     #[inline]
-    fn dma_store(&mut self, x: Reg, bus: &mut Bus) {
+    fn store_dma(&mut self, x: Reg, bus: &mut Bus) {
         let i = self.i as usize;
         for (reg, value) in bus
             .get_mut(i..=i + x)
@@ -785,8 +814,12 @@ impl CPU {
         }
     }
     /// Fx65: DMA Load from I to registers 0..X
+    /// 
+    /// # Authenticity
+    /// The original chip-8 interpreter uses I to directly index memory,
+    /// with the side effect of leaving I as I+X+1 after the transfer is done.
     #[inline]
-    fn dma_load(&mut self, x: Reg, bus: &mut Bus) {
+    fn load_dma(&mut self, x: Reg, bus: &mut Bus) {
         let i = self.i as usize;
         for (reg, value) in bus
             .get(i + 0..=i + x)
