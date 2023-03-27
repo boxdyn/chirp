@@ -26,5 +26,5 @@ pub mod prelude {
     pub use bus::{Bus, Read, Region::*, Write};
     pub use cpu::{disassemble::Disassemble, ControlFlags, CPU};
     pub use error::Result;
-    pub use io::{WindowBuilder, *};
+    pub use io::{UIBuilder, *};
 }
