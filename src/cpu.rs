@@ -15,12 +15,58 @@ type Reg = usize;
 type Adr = u16;
 type Nib = u8;
 
+/// Controls the authenticity behavior of the CPU on a granular level.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Quirks {
+    /// Binary ops in `8xy`(`1`, `2`, `3`) should set vF to 0
+    pub bin_ops: bool,
+    /// Shift ops in `8xy`(`6`, `E`) should source from vY instead of vX
+    pub shift: bool,
+    /// Draw operations should pause execution until the next timer tick
+    pub draw_wait: bool,
+    /// DMA instructions `Fx55`/`Fx65` should change I to I + x + 1
+    pub dma_inc: bool,
+    /// Indexed jump instructions should go to ADR + v[N] where N is high nibble of adr
+    pub stupid_jumps: bool,
+}
+
+impl From<bool> for Quirks {
+    fn from(value: bool) -> Self {
+        if value {
+            Quirks {
+                bin_ops: true,
+                shift: true,
+                draw_wait: true,
+                dma_inc: true,
+                stupid_jumps: false,
+            }
+        } else {
+            Quirks {
+                bin_ops: false,
+                shift: false,
+                draw_wait: false,
+                dma_inc: false,
+                stupid_jumps: false,
+            }
+        }
+    }
+}
+
+impl Default for Quirks {
+    fn default() -> Self {
+        Self::from(false)
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ControlFlags {
     pub debug: bool,
     pub pause: bool,
     pub keypause: bool,
-    pub authentic: bool,
+    pub vbi_wait: bool,
+    pub lastkey: Option<usize>,
+    pub quirks: Quirks,
+    pub monotonic: Option<usize>,
 }
 
 impl ControlFlags {
@@ -37,8 +83,10 @@ pub struct Keys {
     keys: [bool; 16],
 }
 
+/// Represents the internal state of the CPU interpreter
 #[derive(Clone, Debug, PartialEq)]
 pub struct CPU {
+    pub flags: ControlFlags,
     // memory map info
     screen: Adr,
     font: Adr,
@@ -47,12 +95,12 @@ pub struct CPU {
     sp: Adr,
     i: Adr,
     v: [u8; 16],
-    delay: u8,
-    sound: u8,
+    delay: f64,
+    sound: f64,
     // I/O
-    pub keys: [bool; 16],
-    pub flags: ControlFlags,
+    keys: [bool; 16],
     // Execution data
+    timer: Instant,
     cycle: usize,
     breakpoints: Vec<Adr>,
     disassembler: Disassemble,
@@ -60,36 +108,6 @@ pub struct CPU {
 
 // public interface
 impl CPU {
-    /// Press keys (where `keys` is a bitmap of the keys [F-0])
-    pub fn press(&mut self, key: usize) {
-        if (0..16).contains(&key) {
-            self.keys[key] = true;
-            self.flags.keypause = false;
-        }
-    }
-    /// Release all keys
-    pub fn release(&mut self) {
-        for key in &mut self.keys {
-            *key = false;
-        }
-    }
-
-    /// Set a general purpose register in the CPU
-    /// # Examples
-    /// ```rust
-    /// # use chirp::prelude::*;
-    /// // Create a new CPU, and set v4 to 0x41
-    /// let mut cpu = CPU::default();
-    /// cpu.set_gpr(0x4, 0x41);
-    /// // Dump the CPU registers
-    /// cpu.dump();
-    /// ```
-    pub fn set_gpr(&mut self, gpr: Reg, value: u8) {
-        if let Some(gpr) = self.v.get_mut(gpr) {
-            *gpr = value;
-        }
-    }
-
     /// Constructs a new CPU, taking all configurable parameters
     /// # Examples
     /// ```rust
@@ -111,14 +129,42 @@ impl CPU {
             font,
             pc,
             sp,
-            i: 0,
-            v: [0; 16],
-            delay: 0,
-            sound: 0,
-            cycle: 0,
-            keys: [false; 16],
             breakpoints,
             flags,
+            ..Default::default()
+        }
+    }
+
+    /// Press a key
+    pub fn press(&mut self, key: usize) {
+        if (0..16).contains(&key) {
+            self.keys[key] = true;
+        }
+    }
+    /// Release a key
+    pub fn release(&mut self, key: usize) {
+        if (0..16).contains(&key) {
+            self.keys[key] = false;
+            if self.flags.keypause {
+                self.flags.lastkey = Some(key);
+            }
+            self.flags.keypause = false;
+        }
+    }
+
+    /// Set a general purpose register in the CPU
+    /// # Examples
+    /// ```rust
+    /// # use chirp::prelude::*;
+    /// // Create a new CPU, and set v4 to 0x41
+    /// let mut cpu = CPU::default();
+    /// cpu.set_gpr(0x4, 0x41);
+    /// // Dump the CPU registers
+    /// cpu.dump();
+    /// ```
+    pub fn set_gpr(&mut self, gpr: Reg, value: u8) {
+        if let Some(gpr) = self.v.get_mut(gpr) {
+            *gpr = value;
         }
     }
 
@@ -127,10 +173,15 @@ impl CPU {
         self.pc
     }
 
+    pub fn cycle(&self) -> usize {
+        self.cycle
+    }
+
     /// Soft resets the CPU, releasing keypause and reinitializing the program counter to 0x200
     pub fn soft_reset(&mut self) {
         self.pc = 0x200;
         self.flags.keypause = false;
+        self.flags.vbi_wait = false;
     }
 
     /// Set a breakpoint
@@ -162,38 +213,64 @@ impl CPU {
     pub fn singlestep(&mut self, bus: &mut Bus) -> &mut Self {
         self.flags.pause = false;
         self.tick(bus);
+        self.flags.vbi_wait = false;
         self.flags.pause = true;
         self
     }
+
     /// Unpauses the emulator for `steps` ticks
     /// Ticks the timers every `rate` ticks
-    pub fn multistep(&mut self, bus: &mut Bus, steps: usize, rate: usize) -> &mut Self {
+    pub fn multistep(&mut self, bus: &mut Bus, steps: usize) -> &mut Self {
         for _ in 0..steps {
             self.tick(bus);
-            if rate != 0 && self.cycle % rate == rate - 1 {
-                self.tick_timer();
-            }
+            self.vertical_blank();
         }
         self
     }
 
-    /// Ticks the delay and sound timers
-    pub fn tick_timer(&mut self) -> &mut Self {
+    /// Signals the start of a vertical blank
+    ///
+    /// - Ticks the sound and delay timers
+    /// - Disables framepause
+    pub fn vertical_blank(&mut self) -> &mut Self {
         if self.flags.pause {
             return self;
         }
-        self.delay = self.delay.saturating_sub(1);
-        self.sound = self.sound.saturating_sub(1);
+        // Use a monotonic counter when testing
+        if let Some(speed) = self.flags.monotonic {
+            if self.flags.vbi_wait {
+                self.flags.vbi_wait = !(self.cycle % speed == 0);
+            }
+            self.delay -= 1.0 / speed as f64;
+            self.sound -= 1.0 / speed as f64;
+            return self;
+        };
+
+        let time = self.timer.elapsed().as_secs_f64() * 60.0;
+        self.timer = Instant::now();
+        if time > 1.0 {
+            self.flags.vbi_wait = false;
+        }
+        if self.delay > 0.0 {
+            self.delay -= time;
+        }
+        if self.sound > 0.0 {
+            self.sound -= time;
+        }
         self
     }
 
     /// Runs a single instruction
     pub fn tick(&mut self, bus: &mut Bus) -> &mut Self {
         // Do nothing if paused
-        if self.flags.pause || self.flags.keypause {
+        if self.flags.pause || self.flags.vbi_wait || self.flags.keypause {
+            // always tick in test mode
+            if self.flags.monotonic.is_some() {
+                self.cycle += 1;
+            }
             return self;
         }
-        let time = Instant::now();
+        self.cycle += 1;
         // fetch opcode
         let opcode: u16 = bus.read(self.pc);
         let pc = self.pc;
@@ -318,9 +395,9 @@ impl CPU {
                 0x65 => self.load_dma(x, bus),
                 _ => self.unimplemented(opcode),
             },
-            _ => unimplemented!("Extracted nibble from byte, got >nibble?"),
+            _ => unreachable!("Extracted nibble from byte, got >nibble?"),
         }
-        let elapsed = time.elapsed();
+        let elapsed = self.timer.elapsed();
         // Print opcode disassembly:
         if self.flags.debug {
             std::println!(
@@ -331,7 +408,6 @@ impl CPU {
                 elapsed.dimmed()
             );
         }
-        self.cycle += 1;
         // process breakpoints
         if self.breakpoints.contains(&self.pc) {
             self.flags.pause = true;
@@ -346,8 +422,7 @@ impl CPU {
             self.pc,
             self.sp,
             self.i,
-            self
-                .v
+            self.v
                 .into_iter()
                 .enumerate()
                 .map(|(i, gpr)| {
@@ -384,21 +459,22 @@ impl Default for CPU {
             sp: 0xefe,
             i: 0,
             v: [0; 16],
-            delay: 0,
-            sound: 0,
+            delay: 0.0,
+            sound: 0.0,
             cycle: 0,
             keys: [false; 16],
             flags: ControlFlags {
                 debug: true,
                 ..Default::default()
             },
+            timer: Instant::now(),
             breakpoints: vec![],
             disassembler: Disassemble::default(),
         }
     }
 }
 
-// Below this point, comments may be duplicated per impl' block, 
+// Below this point, comments may be duplicated per impl' block,
 // since some opcodes handle multiple instructions.
 
 // | 0aaa | Issues a "System call" (ML routine)
@@ -529,46 +605,40 @@ impl CPU {
 // | 8xyE | X = X << 1                         |
 impl CPU {
     /// 8xy0: Loads the value of y into x
-    /// 
-    /// # Authenticity
-    /// The original chip-8 interpreter will clobber vF for any 8-series instruction
     #[inline]
     fn load(&mut self, x: Reg, y: Reg) {
         self.v[x] = self.v[y];
-        if self.flags.authentic {
-            self.v[0xf] = 0;
-        }
     }
     /// 8xy1: Performs bitwise or of vX and vY, and stores the result in vX
-    /// 
-    /// # Authenticity
+    ///
+    /// # Quirk
     /// The original chip-8 interpreter will clobber vF for any 8-series instruction
     #[inline]
     fn or(&mut self, x: Reg, y: Reg) {
         self.v[x] |= self.v[y];
-        if self.flags.authentic {
+        if self.flags.quirks.bin_ops {
             self.v[0xf] = 0;
         }
     }
     /// 8xy2: Performs bitwise and of vX and vY, and stores the result in vX
-    /// 
-    /// # Authenticity
+    ///
+    /// # Quirk
     /// The original chip-8 interpreter will clobber vF for any 8-series instruction
     #[inline]
     fn and(&mut self, x: Reg, y: Reg) {
         self.v[x] &= self.v[y];
-        if self.flags.authentic {
+        if self.flags.quirks.bin_ops {
             self.v[0xf] = 0;
         }
     }
     /// 8xy3: Performs bitwise xor of vX and vY, and stores the result in vX
-    /// 
-    /// # Authenticity
+    ///
+    /// # Quirk
     /// The original chip-8 interpreter will clobber vF for any 8-series instruction
     #[inline]
     fn xor(&mut self, x: Reg, y: Reg) {
         self.v[x] ^= self.v[y];
-        if self.flags.authentic {
+        if self.flags.quirks.bin_ops {
             self.v[0xf] = 0;
         }
     }
@@ -587,13 +657,12 @@ impl CPU {
         self.v[0xf] = (!carry).into();
     }
     /// 8xy6: Performs bitwise right shift of vX
-    /// 
-    /// # Authenticity
-    /// On the original chip-8 interpreter, this would perform the operation on vY
-    /// and store the result in vX. This behavior was left out, for now.
+    ///
+    /// # Quirk
+    /// On the original chip-8 interpreter, this shifts vY and stores the result in vX
     #[inline]
     fn shift_right(&mut self, x: Reg, y: Reg) {
-        let src: Reg = if self.flags.authentic {y} else {x};
+        let src: Reg = if self.flags.quirks.shift { y } else { x };
         let shift_out = self.v[src] & 1;
         self.v[x] = self.v[src] >> 1;
         self.v[0xf] = shift_out;
@@ -606,13 +675,13 @@ impl CPU {
         self.v[0xf] = (!carry).into();
     }
     /// 8X_E: Performs bitwise left shift of vX
-    /// 
-    /// # Authenticity
+    ///
+    /// # Quirk
     /// On the original chip-8 interpreter, this would perform the operation on vY
     /// and store the result in vX. This behavior was left out, for now.
     #[inline]
     fn shift_left(&mut self, x: Reg, y: Reg) {
-        let src: Reg = if self.flags.authentic {y} else {x};
+        let src: Reg = if self.flags.quirks.shift { y } else { x };
         let shift_out: u8 = self.v[src] >> 7;
         self.v[x] = self.v[src] << 1;
         self.v[0xf] = shift_out;
@@ -646,9 +715,17 @@ impl CPU {
 // | Baaa | Jump to &adr + v0
 impl CPU {
     /// Badr: Jump to &adr + v0
+    ///
+    /// Quirk:
+    /// On the Super-Chip, this does stupid shit
     #[inline]
     fn jump_indexed(&mut self, a: Adr) {
-        self.pc = a.wrapping_add(self.v[0] as Adr);
+        let reg = if self.flags.quirks.stupid_jumps {
+            a as usize >> 8
+        } else {
+            0
+        };
+        self.pc = a.wrapping_add(self.v[reg] as Adr);
     }
 }
 
@@ -664,9 +741,14 @@ impl CPU {
 // | Dxyn | Draws n-byte sprite to the screen at coordinates (vX, vY)
 impl CPU {
     /// Dxyn: Draws n-byte sprite to the screen at coordinates (vX, vY)
-    #[inline]
+    ///
+    /// # Quirk
+    /// On the original chip-8 interpreter, this will wait for a VBI
     fn draw(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut Bus) {
-        let (x, y) = (self.v[x] as u16, self.v[y] as u16);
+        let (x, y) = (self.v[x] as u16 % 64, self.v[y] as u16 % 32);
+        if self.flags.quirks.draw_wait {
+            self.flags.vbi_wait = true;
+        }
         self.v[0xf] = 0;
         for byte in 0..n as u16 {
             if y + byte > 32 {
@@ -736,19 +818,15 @@ impl CPU {
     /// ```
     #[inline]
     fn load_delay_timer(&mut self, x: Reg) {
-        self.v[x] = self.delay;
+        self.v[x] = self.delay as u8;
     }
     /// Fx0A: Wait for key, then vX = K
     #[inline]
     fn wait_for_key(&mut self, x: Reg) {
-        let mut pressed = false;
-        for bit in 0..16 {
-            if self.keys[bit] {
-                self.v[x] = bit as u8;
-                pressed = true;
-            }
-        }
-        if !pressed {
+        if let Some(key) = self.flags.lastkey {
+            self.v[x] = key as u8;
+            self.flags.lastkey = None;
+        } else {
             self.pc = self.pc.wrapping_sub(2);
             self.flags.keypause = true;
         }
@@ -759,7 +837,7 @@ impl CPU {
     /// ```
     #[inline]
     fn store_delay_timer(&mut self, x: Reg) {
-        self.delay = self.v[x];
+        self.delay = self.v[x] as f64;
     }
     /// Fx18: Load vX into ST
     /// ```py
@@ -767,7 +845,7 @@ impl CPU {
     /// ```
     #[inline]
     fn store_sound_timer(&mut self, x: Reg) {
-        self.sound = self.v[x];
+        self.sound = self.v[x] as f64;
     }
     /// Fx1e: Add vX to I,
     /// ```py
@@ -794,8 +872,8 @@ impl CPU {
         bus.write(self.i, x / 100 % 10);
     }
     /// Fx55: DMA Stor from I to registers 0..X
-    /// 
-    /// # Authenticity
+    ///
+    /// # Quirk
     /// The original chip-8 interpreter uses I to directly index memory,
     /// with the side effect of leaving I as I+X+1 after the transfer is done.
     #[inline]
@@ -809,13 +887,13 @@ impl CPU {
         {
             *value = self.v[reg]
         }
-        if self.flags.authentic {
+        if self.flags.quirks.dma_inc {
             self.i += x as Adr + 1;
         }
     }
     /// Fx65: DMA Load from I to registers 0..X
-    /// 
-    /// # Authenticity
+    ///
+    /// # Quirk
     /// The original chip-8 interpreter uses I to directly index memory,
     /// with the side effect of leaving I as I+X+1 after the transfer is done.
     #[inline]
@@ -829,7 +907,7 @@ impl CPU {
         {
             self.v[reg] = *value;
         }
-        if self.flags.authentic {
+        if self.flags.quirks.dma_inc {
             self.i += x as Adr + 1;
         }
     }

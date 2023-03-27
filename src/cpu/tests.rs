@@ -14,6 +14,7 @@ fn setup_environment() -> (CPU, Bus) {
             flags: ControlFlags {
                 debug: true,
                 pause: false,
+                monotonic: Some(8),
                 ..Default::default()
             },
             ..CPU::default()
@@ -27,6 +28,10 @@ fn setup_environment() -> (CPU, Bus) {
             Screen  [0x0F00..0x1000] = include_bytes!("../../chip-8/IBM Logo.ch8"),
         },
     )
+}
+
+fn print_screen(bytes: &[u8]) {
+    bus! {Screen [0..0x100] = bytes}.print_screen().unwrap()
 }
 
 /// Unused instructions
@@ -72,7 +77,7 @@ mod sys {
         let sp_orig = cpu.sp;
         // Place the address on the stack
         bus.write(cpu.sp.wrapping_add(2), test_addr);
-        
+
         cpu.ret(&mut bus);
 
         // Verify the current address is the address from the stack
@@ -251,7 +256,6 @@ mod math {
     }
 
     /// 8xy0: Loads the value of y into x
-    // TODO: Test with authentic flag set
     #[test]
     fn load() {
         let (mut cpu, _) = setup_environment();
@@ -275,10 +279,11 @@ mod math {
     }
 
     /// 8xy1: Performs bitwise or of vX and vY, and stores the result in vX
-    // TODO: Test with authentic flag set
+    // TODO: Test with bin_ops quirk flag set
     #[test]
-    fn or() {
+    fn or_inaccurate() {
         let (mut cpu, _) = setup_environment();
+        cpu.flags.quirks.bin_ops = false;
         for word in 0..=0xffff {
             let (a, b) = (word as u8, (word >> 4) as u8);
             let expected_result = a | b;
@@ -297,10 +302,11 @@ mod math {
     }
 
     /// 8xy2: Performs bitwise and of vX and vY, and stores the result in vX
-    // TODO: Test with authentic flag set
+    // TODO: Test with bin_ops quirk flag set
     #[test]
-    fn and() {
+    fn and_inaccurate() {
         let (mut cpu, _) = setup_environment();
+        cpu.flags.quirks.bin_ops = false;
         for word in 0..=0xffff {
             let (a, b) = (word as u8, (word >> 4) as u8);
             let expected_result = a & b;
@@ -319,10 +325,11 @@ mod math {
     }
 
     /// 8xy3: Performs bitwise xor of vX and vY, and stores the result in vX
-    // TODO: Test with authentic flag set
+    // TODO: Test with bin_ops quirk flag set
     #[test]
-    fn xor() {
+    fn xor_inaccurate() {
         let (mut cpu, _) = setup_environment();
+        cpu.flags.quirks.bin_ops = false;
         for word in 0..=0xffff {
             let (a, b) = (word as u8, (word >> 4) as u8);
             let expected_result = a ^ b;
@@ -521,41 +528,74 @@ mod io {
 
     mod display {
         use super::*;
+        #[derive(Debug)]
         struct ScreenTest {
             program: &'static [u8],
             screen: &'static [u8],
             steps: usize,
-            rate: usize,
+            quirks: Quirks,
         }
 
         const SCREEN_TESTS: [ScreenTest; 4] = [
             // Passing BC_test
+            // # Quirks:
+            // - Requires
             ScreenTest {
                 program: include_bytes!("../../chip-8/BC_test.ch8"),
-                screen: include_bytes!("tests/BC_test.ch8_197.bin"),
-                steps: 197,
-                rate: 8,
+                screen: include_bytes!("tests/screens/BC_test.ch8/197.bin"),
+                steps: 250,
+                quirks: Quirks {
+                    bin_ops: true,
+                    shift: false,
+                    draw_wait: true,
+
+                    dma_inc: false,
+                    stupid_jumps: false,
+                },
             },
             // The IBM Logo
             ScreenTest {
                 program: include_bytes!("../../chip-8/IBM Logo.ch8"),
-                screen: include_bytes!("tests/IBM Logo.ch8_20.bin"),
+                screen: include_bytes!("tests/screens/IBM Logo.ch8/20.bin"),
                 steps: 20,
-                rate: 8,
+                quirks: Quirks {
+                    bin_ops: true,
+                    shift: true,
+                    draw_wait: false,
+
+                    dma_inc: true,
+                    stupid_jumps: false,
+                },
             },
             // Rule 22 cellular automata
+            // # Quirks
+            // - Requires draw_wait false, or it just takes AGES.
             ScreenTest {
                 program: include_bytes!("../../chip-8/1dcell.ch8"),
-                screen: include_bytes!("tests/1dcell.ch8_123342.bin"),
+                screen: include_bytes!("tests/screens/1dcell.ch8/123342.bin"),
                 steps: 123342,
-                rate: 8,
+                quirks: Quirks {
+                    bin_ops: true,
+                    shift: true,
+                    draw_wait: false,
+
+                    dma_inc: true,
+                    stupid_jumps: false,
+                },
             },
             // Rule 60 cellular automata
             ScreenTest {
                 program: include_bytes!("../../chip-8/1dcell.ch8"),
-                screen: include_bytes!("tests/1dcell.ch8_2391162.bin"),
+                screen: include_bytes!("tests/screens/1dcell.ch8/2391162.bin"),
                 steps: 2391162,
-                rate: 8,
+                quirks: Quirks {
+                    bin_ops: true,
+                    shift: true,
+                    draw_wait: false,
+
+                    dma_inc: true,
+                    stupid_jumps: false,
+                },
             },
         ];
 
@@ -564,11 +604,16 @@ mod io {
         fn draw() {
             for test in SCREEN_TESTS {
                 let (mut cpu, mut bus) = setup_environment();
+                cpu.flags.quirks = test.quirks;
                 // Load the test program
                 bus = bus.load_region(Program, test.program);
                 // Run the test program for the specified number of steps
-                cpu.multistep(&mut bus, test.steps, test.rate);
+                while cpu.cycle() < test.steps {
+                    cpu.multistep(&mut bus, test.steps - cpu.cycle());
+                }
                 // Compare the screen to the reference screen buffer
+                bus.print_screen().unwrap();
+                print_screen(test.screen);
                 assert_eq!(bus.get_region(Screen).unwrap(), test.screen);
             }
         }
@@ -605,7 +650,7 @@ mod io {
         for word in 0..=0xff {
             for x in 0..=0xf {
                 // set the register under test to `word`
-                cpu.delay = word;
+                cpu.delay = word as f64;
                 // do the thing
                 cpu.load_delay_timer(x);
                 // validate the result
@@ -625,7 +670,7 @@ mod io {
                 // do the thing
                 cpu.store_delay_timer(x);
                 // validate the result
-                assert_eq!(cpu.delay, word);
+                assert_eq!(cpu.delay, word as f64);
             }
         }
     }
@@ -641,7 +686,7 @@ mod io {
                 // do the thing
                 cpu.store_sound_timer(x);
                 // validate the result
-                assert_eq!(cpu.sound, word);
+                assert_eq!(cpu.sound, word as f64);
             }
         }
     }
@@ -744,20 +789,30 @@ mod io {
     }
 
     /// Fx55: DMA Stor from I to registers 0..X
-    // TODO: Test with authentic flag unset
-    // TODO: Test with authentic flag set
-    //#[test]
+    // TODO: Test with dma_inc quirk set
+    #[test]
     #[allow(dead_code)]
     fn dma_store() {
-        todo!()
-        // Load values into registers
-        // Perform DMA store
-        // Check that
+        let (mut cpu, mut bus) = setup_environment();
+        const DATA: &[u8] = b"ABCDEFGHIJKLMNOP";
+        // Load some test data into memory
+        let addr = 0x456;
+        cpu.v.as_mut_slice().write(DATA).unwrap();
+        for len in 0..16 {
+            // Perform DMA store
+            cpu.i = addr as u16;
+            cpu.store_dma(len, &mut bus);
+            // Check that bus grabbed the correct data
+            let mut bus = bus.get_mut(addr..addr + DATA.len()).unwrap();
+            assert_eq!(bus[0..=len], DATA[0..=len]);
+            assert_eq!(bus[len + 1..], [0; 16][len + 1..]);
+            // clear
+            bus.write(&[0; 16]).unwrap();
+        }
     }
 
     /// Fx65: DMA Load from I to registers 0..X
-    // TODO: Test with authentic flag unset
-    // TODO: Test with authentic flag set
+    // TODO: Test with dma_inc quirk set
     #[test]
     #[allow(dead_code)]
     fn dma_load() {
@@ -779,5 +834,74 @@ mod io {
             // clear
             cpu.v = [0; 16];
         }
+    }
+}
+
+/// These are a series of interpreter tests using Timendus's incredible test suite
+mod chip8_test_suite {
+    use super::*;
+
+    struct SuiteTest {
+        program: &'static [u8],
+        screen: &'static [u8],
+    }
+
+    fn run_screentest(test: SuiteTest, mut cpu: CPU, mut bus: Bus) {
+        // Load the test program
+        bus = bus.load_region(Program, test.program);
+        // The test suite always initiates a keypause on test completion
+        while !cpu.flags.keypause {
+            cpu.multistep(&mut bus, 8);
+        }
+        // Compare the screen to the reference screen buffer
+        bus.print_screen().unwrap();
+        bus! {crate::bus::Region::Screen [0..256] = test.screen}
+            .print_screen()
+            .unwrap();
+        assert_eq!(bus.get_region(Screen).unwrap(), test.screen);
+    }
+
+    #[test]
+    fn splash_screen() {
+        let (mut c, b) = setup_environment();
+        c.flags.quirks = true.into();
+        run_screentest(
+            SuiteTest {
+                program: include_bytes!("tests/chip8-test-suite/bin/chip8-test-suite.ch8"),
+                screen: include_bytes!("tests/screens/chip8-test-suite.ch8/splash.bin"),
+            },
+            c,
+            b,
+        )
+    }
+
+    #[test]
+    fn flags_test() {
+        let (mut c, mut b) = setup_environment();
+        c.flags.quirks = true.into();
+        b.write(0x1ffu16, 3u8);
+        run_screentest(
+            SuiteTest {
+                program: include_bytes!("tests/chip8-test-suite/bin/chip8-test-suite.ch8"),
+                screen: include_bytes!("tests/screens/chip8-test-suite.ch8/flags.bin"),
+            },
+            c,
+            b,
+        )
+    }
+
+    #[test]
+    fn quirks_test() {
+        let (mut c, mut b) = setup_environment();
+        c.flags.quirks = true.into();
+        b.write(0x1feu16, 0x0104u16);
+        run_screentest(
+            SuiteTest {
+                program: include_bytes!("tests/chip8-test-suite/bin/chip8-test-suite.ch8"),
+                screen: include_bytes!("tests/screens/chip8-test-suite.ch8/quirks.bin"),
+            },
+            c,
+            b,
+        )
     }
 }
