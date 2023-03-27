@@ -1,3 +1,6 @@
+// (c) 2023 John A. Breaux
+// This code is licensed under MIT license (see LICENSE.txt for details)
+
 //! Error type for chumpulator
 
 use thiserror::Error;
@@ -14,5 +17,5 @@ pub enum Error {
     #[error(transparent)]
     IoError(#[from] std::io::Error),
     #[error(transparent)]
-    WindowError(#[from] minifb::Error)
+    WindowError(#[from] minifb::Error),
 }

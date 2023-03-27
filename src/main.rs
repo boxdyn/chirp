@@ -1,3 +1,6 @@
+// (c) 2023 John A. Breaux
+// This code is licensed under MIT license (see LICENSE.txt for details)
+
 //! Chirp: A chip-8 interpreter in Rust
 //! Hello, world!
 

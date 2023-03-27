@@ -1,3 +1,6 @@
+// (c) 2023 John A. Breaux
+// This code is licensed under MIT license (see LICENSE.txt for details)
+
 //! Represents a chip-8 instruction as a Rust enum
 
 use super::{Adr, Nib, Reg};

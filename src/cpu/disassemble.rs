@@ -1,3 +1,6 @@
+// (c) 2023 John A. Breaux
+// This code is licensed under MIT license (see LICENSE.txt for details)
+
 //! A disassembler for Chip-8 opcodes
 
 use super::{Adr, Nib, Reg};

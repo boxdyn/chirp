@@ -1,4 +1,8 @@
+// (c) 2023 John A. Breaux
+// This code is licensed under MIT license (see LICENSE.txt for details)
+
 //! The Bus connects the CPU to Memory
+//! This is more of a memory management unit + some utils for reading/writing
 
 use crate::error::Result;
 use std::{

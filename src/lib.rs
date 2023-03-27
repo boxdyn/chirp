@@ -1,11 +1,12 @@
-#![feature(stmt_expr_attributes)]
-/*!
-This crate implements a Chip-8 interpreter as if it were a real CPU architecture,
-to the best of my current knowledge. As it's the first emulator project I've
-embarked on, and I'm fairly new to Rust, it's going to be rough around the edges.
+// (c) 2023 John A. Breaux
+// This code is licensed under MIT license (see LICENSE.txt for details)
 
-Hopefully, though, you'll find some use in it.
- */
+#![feature(stmt_expr_attributes)]
+//! This crate implements a Chip-8 interpreter as if it were a real CPU architecture,
+//! to the best of my current knowledge. As it's the first emulator project I've
+//! embarked on, and I'm fairly new to Rust, it's going to be rough around the edges.
+//!
+//! Hopefully, though, you'll find some use in it.
 
 pub mod bus;
 pub mod cpu;
@@ -20,8 +21,8 @@ pub struct Chip8 {
 
 /// Common imports for chumpulator
 pub mod prelude {
-    use super::*;
     pub use super::Chip8;
+    use super::*;
     pub use crate::bus;
     pub use bus::{Bus, Read, Region::*, Write};
     pub use cpu::{disassemble::Disassemble, ControlFlags, CPU};

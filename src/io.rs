@@ -1,3 +1,6 @@
+// (c) 2023 John A. Breaux
+// This code is licensed under MIT license (see LICENSE.txt for details)
+
 //! Platform-specific IO/UI code, and some debug functionality.
 //! TODO: Break this into its own crate.
 
