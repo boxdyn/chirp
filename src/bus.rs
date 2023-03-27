@@ -53,12 +53,16 @@ pub enum Region {
 
 impl Display for Region {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Region::Charset => "charset",
-            Region::Program => "program",
-            Region::Screen => "screen",
-            Region::Stack => "stack",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Region::Charset => "charset",
+                Region::Program => "program",
+                Region::Screen => "screen",
+                Region::Stack => "stack",
+            }
+        )
     }
 }
 
@@ -188,6 +192,7 @@ impl Write<u16> for Bus {
     }
 }
 
+#[cfg(target_feature = "rhexdump")]
 impl Display for Bus {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         use rhexdump::Rhexdump;
