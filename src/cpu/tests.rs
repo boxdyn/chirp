@@ -57,9 +57,7 @@ mod sys {
     #[test]
     fn clear_screen() {
         let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0x00e0u16);
-        // Check if screen RAM is cleared
-        cpu.tick(&mut bus);
+        cpu.clear_screen(&mut bus);
         bus.get_region(Screen)
             .expect("Expected screen, got None")
             .iter()
@@ -74,12 +72,13 @@ mod sys {
         let sp_orig = cpu.sp;
         // Place the address on the stack
         bus.write(cpu.sp.wrapping_add(2), test_addr);
-        // Call an address
+        
         cpu.ret(&mut bus);
+
         // Verify the current address is the address from the stack
         assert_eq!(test_addr, cpu.pc);
-        assert!(dbg!(cpu.sp.wrapping_sub(sp_orig)) == 0x2);
         // Verify the stack pointer has moved
+        assert!(dbg!(cpu.sp.wrapping_sub(sp_orig)) == 0x2);
     }
 }
 
@@ -736,7 +735,7 @@ mod io {
                 // load CPU registers
                 cpu.i = addr as u16;
                 cpu.v[5] = test.input;
-                // run instruction
+
                 cpu.bcd_convert(5, &mut bus);
                 // validate the results
                 assert_eq!(bus.get(addr..addr.saturating_add(3)), Some(test.output))
