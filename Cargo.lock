@@ -37,7 +37,6 @@ name = "chirp"
 version = "0.1.0"
 dependencies = [
  "gumdrop",
- "hex-wrapper",
  "minifb",
  "owo-colors",
  "rand",
@@ -231,12 +230,6 @@ name = "hermit-abi"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fed44880c466736ef9a5c5b5facefb5ed0785676d0c02d612db14e54f0d84286"
-
-[[package]]
-name = "hex-wrapper"
-version = "1.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21ee81c2a2396bc6afc4206272515c808a9306d885d0dc018b55da1236c1ed1a"
 
 [[package]]
 name = "instant"
