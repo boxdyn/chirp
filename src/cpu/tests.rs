@@ -841,6 +841,7 @@ mod io {
 }
 
 /// These are a series of interpreter tests using Timendus's incredible test suite
+/// TODO: These are technically integration tests, and should be moved to src/tests
 mod chip8_test_suite {
     use super::*;
 

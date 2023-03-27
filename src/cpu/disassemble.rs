@@ -336,14 +336,14 @@ impl Disassemble {
     /// DT = vX
     /// ```
     pub fn load_delay_timer(&self, x: Reg) -> String {
-        format!("ld     v{x:X}, DT").style(self.normal).to_string()
+        format!("mov    v{x:X}, DT").style(self.normal).to_string()
     }
     /// `Fx18`: Load vX into ST
     /// ```py
     /// ST = vX;
     /// ```
     pub fn load_sound_timer(&self, x: Reg) -> String {
-        format!("ld     v{x:X}, ST").style(self.normal).to_string()
+        format!("mov    v{x:X}, ST").style(self.normal).to_string()
     }
     /// `Fx1e`: Add vX to I,
     /// ```py
@@ -352,24 +352,24 @@ impl Disassemble {
     pub fn add_to_indirect(&self, x: Reg) -> String {
         format!("add    v{x:X}, I").style(self.normal).to_string()
     }
-    /// `Fx29`: Load sprite for character x into I
+    /// `Fx29`: Load sprite for character in vX into I
     /// ```py
     /// I = sprite(X);
     /// ```
     pub fn load_sprite_x(&self, x: Reg) -> String {
-        format!("font   #{x:X}, I").style(self.normal).to_string()
+        format!("font   v{x:X}, I").style(self.normal).to_string()
     }
     /// `Fx33`: BCD convert X into I`[0..3]`
     pub fn bcd_convert_i(&self, x: Reg) -> String {
-        format!("bcd    {x:X}, &I").style(self.normal).to_string()
+        format!("bcd    v{x:X}, &I").style(self.normal).to_string()
     }
     /// `Fx55`: DMA Stor from I to registers 0..X
     pub fn dma_store(&self, x: Reg) -> String {
-        format!("dmao   {x:X}").style(self.normal).to_string()
+        format!("dmao   v{x:X}").style(self.normal).to_string()
     }
     /// `Fx65`: DMA Load from I to registers 0..X
     pub fn dma_load(&self, x: Reg) -> String {
-        format!("dmai   {x:X}").style(self.normal).to_string()
+        format!("dmai   v{x:X}").style(self.normal).to_string()
     }
 }
 
