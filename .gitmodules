@@ -1,0 +1,3 @@
+[submodule "src/cpu/tests/chip8-test-suite"]
+	path = src/cpu/tests/chip8-test-suite
+	url = https://github.com/Timendus/chip8-test-suite.git
