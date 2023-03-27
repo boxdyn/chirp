@@ -12,27 +12,27 @@ use std::{
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Options, Hash)]
 struct Arguments {
-    #[options(help = "Print help text and exit")]
+    #[options(help = "Print this help message.")]
     help: bool,
-    #[options(help = "Enable behavior incompatible with modern software")]
+    #[options(help = "Enable behavior incompatible with modern software.")]
     pub authentic: bool,
     #[options(
         long = "break",
-        help = "Set breakpoints for the emulator to stop at",
+        help = "Set breakpoints for the emulator to stop at.",
         parse(try_from_str = "parse_hex")
     )]
     pub breakpoints: Vec<u16>,
-    #[options(help = "Enable debug mode at startup")]
+    #[options(help = "Enable debug mode at startup.")]
     pub debug: bool,
-    #[options(help = "Enable pause mode at startup", default = "false")]
+    #[options(help = "Enable pause mode at startup.", default = "false")]
     pub pause: bool,
-    #[options(help = "Load a ROM to run on Chirp", required, free)]
+    #[options(help = "Load a ROM to run on Chirp.", required, free)]
     pub file: PathBuf,
-    #[options(help = "Set the target framerate", default = "60")]
+    #[options(help = "Set the target framerate.", default = "60")]
     pub frame_rate: u64,
-    #[options(help = "Set the instructions-per-frame rate", default = "8")]
+    #[options(help = "Set the instructions-per-frame rate.", default = "8")]
     pub speed: usize,
-    #[options(help = "Run the emulator as fast as possible for `step` instructions")]
+    #[options(help = "Run the emulator as fast as possible for `step` instructions.")]
     pub step: Option<usize>,
 }
 
