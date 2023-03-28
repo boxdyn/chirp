@@ -29,7 +29,7 @@ pub struct Quirks {
     pub draw_wait: bool,
     /// DMA instructions `Fx55`/`Fx65` should change I to I + x + 1
     pub dma_inc: bool,
-    /// Indexed jump instructions should go to ADR + v[N] where N is high nibble of adr
+    /// Indexed jump instructions should go to ADR + v`N` where `N` is high nibble of adr
     pub stupid_jumps: bool,
 }
 
@@ -73,17 +73,14 @@ pub struct ControlFlags {
 }
 
 impl ControlFlags {
+    /// Toggles debug mode
     pub fn debug(&mut self) {
         self.debug = !self.debug
     }
+    /// Toggles pause
     pub fn pause(&mut self) {
         self.pause = !self.pause
     }
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Keys {
-    keys: [bool; 16],
 }
 
 /// Represents the internal state of the CPU interpreter
@@ -111,11 +108,21 @@ pub struct CPU {
 
 // public interface
 impl CPU {
+    // TODO: implement From<&bus> for CPU
     /// Constructs a new CPU, taking all configurable parameters
     /// # Examples
     /// ```rust
     /// # use chirp::prelude::*;
-    /// let mut cpu = CPU::new(0xf00, 0x50, 0x200, 0xefe, Disassemble::default(), vec![], ControlFlags::default());
+    /// let cpu = CPU::new(
+    ///     0xf00,  // screen location
+    ///     0x50,   // font location
+    ///     0x200,  // start of program
+    ///     0xefe,  // top of stack
+    ///     Disassemble::default(),
+    ///     vec![], // Breakpoints
+    ///     ControlFlags::default()
+    /// );
+    /// dbg!(cpu);
     /// ```
     pub fn new(
         screen: Adr,
@@ -138,13 +145,36 @@ impl CPU {
         }
     }
 
-    /// Press a key
+    /// Presses a key
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     cpu.press(0x7);
+    ///     cpu.press(0xF);
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn press(&mut self, key: usize) {
         if (0..16).contains(&key) {
             self.keys[key] = true;
         }
     }
-    /// Release a key
+
+    /// Releases a key
+    ///
+    /// If keypause is enabled, this disables keypause and records the last released key.
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     cpu.press(0x7);
+    ///     cpu.release(0x7);
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn release(&mut self, key: usize) {
         if (0..16).contains(&key) {
             self.keys[key] = false;
@@ -155,7 +185,7 @@ impl CPU {
         }
     }
 
-    /// Set a general purpose register in the CPU
+    /// Sets a general purpose register in the CPU
     /// # Examples
     /// ```rust
     /// # use chirp::prelude::*;
@@ -171,16 +201,62 @@ impl CPU {
         }
     }
 
-    /// Get the program counter
+    /// Gets the program counter
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     assert_eq!(0x200, cpu.pc());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn pc(&self) -> Adr {
         self.pc
     }
 
+    /// Gets the number of cycles the CPU has executed
+    ///
+    /// If cpu.flags.monotonic is Some, the cycle count will be
+    /// updated even when the CPU is in drawpause or keypause
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     assert_eq!(0x0, cpu.cycle());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn cycle(&self) -> usize {
         self.cycle
     }
 
-    /// Soft resets the CPU, releasing keypause and reinitializing the program counter to 0x200
+    /// Soft resets the CPU, releasing keypause and
+    /// reinitializing the program counter to 0x200
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::new(
+    ///         0xf00,
+    ///         0x50,
+    ///         0x340,
+    ///         0xefe,
+    ///         Disassemble::default(),
+    ///         vec![],
+    ///         ControlFlags::default()
+    ///     );
+    ///     cpu.flags.keypause = true;
+    ///     cpu.flags.vbi_wait = true;
+    ///     assert_eq!(0x340, cpu.pc());
+    ///     cpu.soft_reset();
+    ///     assert_eq!(0x200, cpu.pc());
+    ///     assert_eq!(false, cpu.flags.keypause);
+    ///     assert_eq!(false, cpu.flags.vbi_wait);
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn soft_reset(&mut self) {
         self.pc = 0x200;
         self.flags.keypause = false;
@@ -188,6 +264,7 @@ impl CPU {
     }
 
     /// Set a breakpoint
+    // TODO: Unit test this
     pub fn set_break(&mut self, point: Adr) -> &mut Self {
         if !self.breakpoints.contains(&point) {
             self.breakpoints.push(point)
@@ -196,6 +273,7 @@ impl CPU {
     }
 
     /// Unset a breakpoint
+    // TODO: Unit test this
     pub fn unset_break(&mut self, point: Adr) -> &mut Self {
         fn linear_find(needle: Adr, haystack: &Vec<Adr>) -> Option<usize> {
             for (i, v) in haystack.iter().enumerate() {
@@ -211,8 +289,28 @@ impl CPU {
         self
     }
 
-    /// Unpauses the emulator for a single tick
+    /// Unpauses the emulator for a single tick,
+    /// even if cpu.flags.pause is set.
+    ///
     /// NOTE: does not synchronize with delay timers
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     let mut bus = bus!{
+    ///         Program [0x0200..0x0f00] = &[
+    ///             0x00, 0xe0, // cls
+    ///             0x22, 0x02, // jump 0x202 (pc)
+    ///         ],
+    ///         Screen  [0x0f00..0x1000],
+    ///     };
+    ///     cpu.singlestep(&mut bus);
+    ///     assert_eq!(0x202, cpu.pc());
+    ///     assert_eq!(1, cpu.cycle());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn singlestep(&mut self, bus: &mut Bus) -> &mut Self {
         self.flags.pause = false;
         self.tick(bus);
@@ -222,7 +320,26 @@ impl CPU {
     }
 
     /// Unpauses the emulator for `steps` ticks
+    ///
     /// Ticks the timers every `rate` ticks
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     let mut bus = bus!{
+    ///         Program [0x0200..0x0f00] = &[
+    ///             0x00, 0xe0, // cls
+    ///             0x22, 0x02, // jump 0x202 (pc)
+    ///         ],
+    ///         Screen  [0x0f00..0x1000],
+    ///     };
+    ///     cpu.multistep(&mut bus, 0x20);
+    ///     assert_eq!(0x202, cpu.pc());
+    ///     assert_eq!(0x20, cpu.cycle());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn multistep(&mut self, bus: &mut Bus, steps: usize) -> &mut Self {
         for _ in 0..steps {
             self.tick(bus);
@@ -231,10 +348,15 @@ impl CPU {
         self
     }
 
-    /// Signals the start of a vertical blank
+    /// Simulates vertical blanking
     ///
-    /// - Ticks the sound and delay timers
+    /// If monotonic timing is `enabled`:
+    /// - Ticks the sound and delay timers according to CPU cycle count
     /// - Disables framepause
+    /// If monotonic timing is `disabled`:
+    /// - Subtracts the elapsed time in fractions of a frame
+    ///   from st/dt
+    /// - Disables framepause if the duration exceeds that of a frame
     pub fn vertical_blank(&mut self) -> &mut Self {
         if self.flags.pause {
             return self;
@@ -263,7 +385,44 @@ impl CPU {
         self
     }
 
-    /// Runs a single instruction
+    /// Executes a single instruction
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     let mut bus = bus!{
+    ///         Program [0x0200..0x0f00] = &[
+    ///             0x00, 0xe0, // cls
+    ///             0x22, 0x02, // jump 0x202 (pc)
+    ///         ],
+    ///         Screen  [0x0f00..0x1000],
+    ///     };
+    ///     cpu.tick(&mut bus);
+    ///     assert_eq!(0x202, cpu.pc());
+    ///     assert_eq!(1, cpu.cycle());
+    ///#    Ok(())
+    ///# }
+    /// ```
+    /// # Panics
+    /// Will panic if an invalid instruction is executed
+    /// ```rust,should_panic
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///#     cpu.flags.debug = true;        // enable live disassembly
+    ///#     cpu.flags.monotonic = Some(8); // enable monotonic/test timing
+    ///     let mut bus = bus!{
+    ///         Program [0x0200..0x0f00] = &[
+    ///             0xff, 0xff, // invalid!
+    ///             0x22, 0x02, // jump 0x202 (pc)
+    ///         ],
+    ///         Screen  [0x0f00..0x1000],
+    ///     };
+    ///     cpu.multistep(&mut bus, 0x10); // panics!
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn tick(&mut self, bus: &mut Bus) -> &mut Self {
         // Do nothing if paused
         if self.flags.pause || self.flags.vbi_wait || self.flags.keypause {
@@ -418,6 +577,25 @@ impl CPU {
         self
     }
 
+    /// Dumps the current state of all CPU registers, and the cycle count
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     cpu.dump();
+    ///#    Ok(())
+    ///# }
+    /// ```
+    /// outputs
+    /// ```text
+    /// PC: 0200, SP: 0efe, I: 0000
+    /// v0: 00 v1: 00 v2: 00 v3: 00
+    /// v4: 00 v5: 00 v6: 00 v7: 00
+    /// v8: 00 v9: 00 vA: 00 vB: 00
+    /// vC: 00 vD: 00 vE: 00 vF: 00
+    /// DLY: 0, SND: 0, CYC:      0
+    /// ```
     pub fn dump(&self) {
         //let dumpstyle = owo_colors::Style::new().bright_black();
         std::println!(
@@ -454,6 +632,13 @@ impl Default for CPU {
     /// | font   |`0x0050` | Location of font memory.
     /// | pc     |`0x0200` | Start location. Generally 0x200 or 0x600.
     /// | sp     |`0x0efe` | Initial top of stack.
+    ///
+    ///
+    /// # Examples
+    /// ```rust
+    /// use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// ```
     fn default() -> Self {
         CPU {
             screen: 0xf00,

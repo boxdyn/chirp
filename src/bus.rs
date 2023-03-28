@@ -2,6 +2,7 @@
 // This code is licensed under MIT license (see LICENSE.txt for details)
 
 //! The Bus connects the CPU to Memory
+//!
 //! This is more of a memory management unit + some utils for reading/writing
 
 use crate::error::Result;
@@ -12,7 +13,7 @@ use std::{
     slice::SliceIndex,
 };
 
-/// Creates a new bus, instantiating BusConnectable devices
+/// Creates a new bus, growing the backing memory as needed
 /// # Examples
 /// ```rust
 /// # use chirp::prelude::*;
@@ -24,7 +25,7 @@ use std::{
 #[macro_export]
 macro_rules! bus {
     ($($name:path $(:)? [$range:expr] $(= $data:expr)?) ,* $(,)?) => {
-        $crate::bus::Bus::new()
+        $crate::bus::Bus::default()
         $(
             .add_region($name, $range)
             $(
@@ -35,7 +36,7 @@ macro_rules! bus {
 }
 
 // Traits Read and Write are here purely to make implementing other things more bearable
-/// Do whatever `Read` means to you
+/// Read a T from address `addr`
 pub trait Read<T> {
     /// Read a T from address `addr`
     fn read(&self, addr: impl Into<usize>) -> T;
@@ -47,6 +48,7 @@ pub trait Write<T> {
     fn write(&mut self, addr: impl Into<usize>, data: T);
 }
 
+/// Represents a named region in memory
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Region {
     Charset,
@@ -70,7 +72,7 @@ impl Display for Region {
     }
 }
 
-/// Store memory in a series of named regions with ranges
+/// Stores memory in a series of named regions with ranges
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Bus {
     memory: Vec<u8>,
@@ -78,29 +80,94 @@ pub struct Bus {
 }
 
 impl Bus {
-    /// Construct a new bus
+    // TODO: make bus::new() give a properly set up bus with a default memory map
+    /// Constructs a new bus
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let bus = Bus::new();
+    ///     assert!(bus.is_empty());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn new() -> Self {
         Bus::default()
     }
+
     /// Gets the length of the bus' backing memory
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let bus = Bus::new()
+    ///         .add_region(Program, 0..1234);
+    ///     assert_eq!(1234, bus.len());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn len(&self) -> usize {
         self.memory.len()
     }
+
     /// Returns true if the backing memory contains no elements
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let bus = Bus::new();
+    ///     assert!(bus.is_empty());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.memory.is_empty()
     }
     /// Grows the Bus backing memory to at least size bytes, but does not truncate
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut bus = Bus::new();
+    ///     bus.with_size(1234);
+    ///     assert_eq!(1234, bus.len());
+    ///     bus.with_size(0);
+    ///     assert_eq!(1234, bus.len());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn with_size(&mut self, size: usize) {
         if self.len() < size {
             self.memory.resize(size, 0);
         }
     }
+    /// Adds a new named range (Region) to the bus
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let bus = Bus::new().add_region(Program, 0..1234);
+    ///     assert_eq!(1234, bus.len());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn add_region(mut self, name: Region, range: Range<usize>) -> Self {
         self.with_size(range.end);
         self.region.insert(name, range);
         self
     }
+    /// Loads data into a named region
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let bus = Bus::new()
+    ///         .add_region(Program, 0..1234)
+    ///         .load_region(Program, b"Hello, world!");
+    ///# // TODO: Test if region actually contains "Hello, world!"
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn load_region(mut self, name: Region, data: &[u8]) -> Self {
         use std::io::Write;
         if let Some(mut region) = self.get_region_mut(name) {
@@ -108,34 +175,114 @@ impl Bus {
         }
         self
     }
+    /// Fills a named region with zeroes
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let bus = Bus::new()
+    ///         .add_region(Program, 0..1234)
+    ///         .clear_region(Program);
+    ///# // TODO: test if region actually clear
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn clear_region(&mut self, name: Region) -> &mut Self {
         if let Some(region) = self.get_region_mut(name) {
             region.fill(0)
         }
         self
     }
+
     /// Gets a slice of bus memory
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let bus = Bus::new()
+    ///         .add_region(Program, 0..10);
+    ///     assert!([0;10].as_slice() == bus.get(0..10).unwrap());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn get<I>(&self, index: I) -> Option<&<I as SliceIndex<[u8]>>::Output>
     where
         I: SliceIndex<[u8]>,
     {
         self.memory.get(index)
     }
+
     /// Gets a mutable slice of bus memory
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut bus = Bus::new()
+    ///         .add_region(Program, 0..10);
+    ///     assert!([0;10].as_slice() == bus.get_mut(0..10).unwrap());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn get_mut<I>(&mut self, index: I) -> Option<&mut <I as SliceIndex<[u8]>>::Output>
     where
         I: SliceIndex<[u8]>,
     {
         self.memory.get_mut(index)
     }
+
     /// Gets a slice of a named region of memory
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let bus = Bus::new()
+    ///         .add_region(Program, 0..10);
+    ///     assert!([0;10].as_slice() == bus.get_region(Program).unwrap());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn get_region(&self, name: Region) -> Option<&[u8]> {
         self.get(self.region.get(&name)?.clone())
     }
-    /// Gets a mutable slice to a named region of memory
+
+    /// Gets a mutable slice of a named region of memory
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut bus = Bus::new()
+    ///         .add_region(Program, 0..10);
+    ///     assert!([0;10].as_slice() == bus.get_region_mut(Program).unwrap());
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn get_region_mut(&mut self, name: Region) -> Option<&mut [u8]> {
         self.get_mut(self.region.get(&name)?.clone())
     }
+
+    /// Prints the region of memory called `Screen` at 1bpp using box characters
+    /// # Examples
+    ///
+    /// [Bus::print_screen] will print the screen
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let bus = Bus::new()
+    ///         .add_region(Screen, 0x000..0x100);
+    ///     bus.print_screen()?;
+    ///#    Ok(())
+    ///# }
+    /// ```
+    /// If there is no Screen region, it will return Err(Error::MissingRegion)
+    /// ```rust,should_panic
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut bus = Bus::new()
+    ///         .add_region(Program, 0..10);
+    ///     bus.print_screen()?;
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn print_screen(&self) -> Result<()> {
         const REGION: Region = Region::Screen;
         if let Some(screen) = self.get_region(REGION) {
@@ -161,6 +308,7 @@ impl Bus {
 }
 
 impl Read<u8> for Bus {
+    /// Read a u8 from address `addr`
     fn read(&self, addr: impl Into<usize>) -> u8 {
         let addr: usize = addr.into();
         *self.memory.get(addr).unwrap_or(&0xc5)
@@ -168,6 +316,7 @@ impl Read<u8> for Bus {
 }
 
 impl Read<u16> for Bus {
+    /// Read a u16 from address `addr`
     fn read(&self, addr: impl Into<usize>) -> u16 {
         let addr: usize = addr.into();
         if let Some(bytes) = self.memory.get(addr..addr + 2) {
@@ -179,6 +328,7 @@ impl Read<u16> for Bus {
 }
 
 impl Write<u8> for Bus {
+    /// Write a u8 to address `addr`
     fn write(&mut self, addr: impl Into<usize>, data: u8) {
         let addr: usize = addr.into();
         if let Some(byte) = self.get_mut(addr) {
@@ -188,6 +338,7 @@ impl Write<u8> for Bus {
 }
 
 impl Write<u16> for Bus {
+    /// Write a u16 to address `addr`
     fn write(&mut self, addr: impl Into<usize>, data: u16) {
         let addr: usize = addr.into();
         if let Some(slice) = self.get_mut(addr..addr + 2) {
