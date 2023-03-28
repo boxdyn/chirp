@@ -216,14 +216,30 @@ impl CPU {
     /// # use chirp::prelude::*;
     /// // Create a new CPU, and set v4 to 0x41
     /// let mut cpu = CPU::default();
-    /// cpu.set_gpr(0x4, 0x41);
+    /// cpu.set_v(0x4, 0x41);
     /// // Dump the CPU registers
     /// cpu.dump();
     /// ```
-    pub fn set_gpr(&mut self, gpr: Reg, value: u8) {
+    pub fn set_v(&mut self, gpr: Reg, value: u8) {
         if let Some(gpr) = self.v.get_mut(gpr) {
             *gpr = value;
         }
+    }
+
+    /// Gets a slice of the entire general purpose register field
+    /// # Examples
+    /// ```rust
+    /// # use chirp::prelude::*;
+    /// // Create a new CPU, and set v4 to 0x41
+    /// let mut cpu = CPU::default();
+    /// cpu.set_v(0x0, 0x41);
+    /// assert_eq!(
+    ///     cpu.v(),
+    ///     [0x41, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    /// )
+    /// ```
+    pub fn v(&self) -> &[u8] {
+        self.v.as_slice()
     }
 
     /// Gets the program counter
@@ -238,6 +254,48 @@ impl CPU {
     /// ```
     pub fn pc(&self) -> Adr {
         self.pc
+    }
+
+    /// Gets the I register
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     assert_eq!(0, cpu.i());
+    ///#    Ok(())
+    ///# }
+    /// ```
+    pub fn i(&self) -> Adr {
+        self.i
+    }
+
+    /// Gets the value in the Sound Timer register
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     assert_eq!(0, cpu.sound());
+    ///#    Ok(())
+    ///# }
+    /// ```
+    pub fn sound(&self) -> u8 {
+        self.sound as u8
+    }
+
+    /// Gets the value in the Delay Timer register
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     assert_eq!(0, cpu.delay());
+    ///#    Ok(())
+    ///# }
+    /// ```
+    pub fn delay(&self) -> u8 {
+        self.delay as u8
     }
 
     /// Gets the number of cycles the CPU has executed
@@ -655,8 +713,8 @@ impl CPU {
                     )
                 })
                 .collect::<String>(),
-            self.delay,
-            self.sound,
+            self.delay as u8,
+            self.sound as u8,
             self.cycle,
         );
     }

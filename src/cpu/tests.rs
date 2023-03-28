@@ -18,6 +18,8 @@ pub(self) use crate::{
     bus::{Bus, Region::*},
 };
 
+mod decode;
+
 fn setup_environment() -> (CPU, Bus) {
     (
         CPU {
@@ -68,12 +70,19 @@ mod unimplemented {
         bus.write(0x200u16, 0x900fu16); // 0x800f is not an instruction
         cpu.tick(&mut bus);
     }
+    #[test]
+    #[should_panic]
+    fn ins_exbb() {
+        let (mut cpu, mut bus) = setup_environment();
+        bus.write(0x200u16, 0xe00fu16); // 0xe00f is not an instruction
+        cpu.tick(&mut bus);
+    }
     // Fxbb
     #[test]
     #[should_panic]
     fn ins_fxbb() {
         let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0xffffu16); // 0xffff is not an instruction
+        bus.write(0x200u16, 0xf00fu16); // 0xf00f is not an instruction
         cpu.tick(&mut bus);
     }
 }
@@ -914,6 +923,61 @@ mod io {
             assert_eq!(cpu.v[len + 1..], [0; 16][len + 1..]);
             // clear
             cpu.v = [0; 16];
+        }
+    }
+}
+
+mod behavior {
+    use super::*;
+    mod realtime {
+        use super::*;
+        use std::time::Duration;
+        #[test]
+        fn delay() {
+            let (mut cpu, mut bus) = setup_environment();
+            cpu.flags.monotonic = None;
+            cpu.delay = 10.0;
+            for _ in 0..2 {
+                cpu.multistep(&mut bus, 8);
+                std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
+            }
+            // time is within 1 frame deviance over a theoretical 2 frame pause
+            assert!(7.0 <= cpu.delay && cpu.delay <= 9.0);
+        }
+        #[test]
+        fn sound() {
+            let (mut cpu, mut bus) = setup_environment();
+            cpu.flags.monotonic = None; // disable monotonic timing
+            cpu.sound = 10.0;
+            for _ in 0..2 {
+                cpu.multistep(&mut bus, 8);
+                std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
+            }
+            // time is within 1 frame deviance over a theoretical 2 frame pause
+            assert!(7.0 <= cpu.sound && cpu.sound <= 9.0);
+        }
+        #[test]
+        fn vbi_wait() {
+            let (mut cpu, mut bus) = setup_environment();
+            cpu.flags.monotonic = None; // disable monotonic timing
+            cpu.flags.vbi_wait = true;
+            for _ in 0..2 {
+                cpu.multistep(&mut bus, 8);
+                std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
+            }
+            // Display wait is disabled after a 1 frame pause
+            assert_eq!(false, cpu.flags.vbi_wait);
+        }
+    }
+    mod breakpoint {
+        use super::*;
+        #[test]
+        fn hit_break() {
+            let (mut cpu, mut bus) = setup_environment();
+            cpu.set_break(0x202);
+            cpu.multistep(&mut bus, 10);
+            assert_eq!(true, cpu.flags.pause);
+            assert_eq!(0x202, cpu.pc);
         }
     }
 }

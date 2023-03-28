@@ -1,4 +1,4 @@
-//! Testing methods on Chirp's structs
+//! Testing methods on Chirp's public API
 use chirp::prelude::*;
 use std::{collections::hash_map::DefaultHasher, hash::Hash};
 
@@ -63,6 +63,7 @@ mod bus {
 
 mod cpu {
     use super::*;
+
     #[test]
     fn set_break() {
         let mut cpu = CPU::default();
@@ -88,6 +89,31 @@ mod cpu {
         }
         // Only unset the matching point
         assert_eq!(cpu.breakpoints(), &[point + 1]);
+    }
+
+    #[test]
+    fn press_invalid_key() {
+        let mut cpu = CPU::default();
+        let cpu2 = cpu.clone();
+        cpu.press(0x21345134);
+        // no change has been made
+        assert_eq!(cpu, cpu2);
+    }
+    #[test]
+    fn release_invalid_key() {
+        let mut cpu = CPU::default();
+        let cpu2 = cpu.clone();
+        cpu.release(0x21345134);
+        // no change has been made
+        assert_eq!(cpu, cpu2);
+    }
+    #[test]
+    fn set_invalid_gpr() {
+        let mut cpu = CPU::default();
+        let cpu2 = cpu.clone();
+        cpu.set_v(0x21345134, 0xff);
+        // no change has been made
+        assert_eq!(cpu, cpu2);
     }
     mod controlflags {
         use super::*;
