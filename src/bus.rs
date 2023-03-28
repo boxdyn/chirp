@@ -7,7 +7,6 @@
 
 use crate::error::Result;
 use std::{
-    collections::HashMap,
     fmt::{Debug, Display, Formatter},
     ops::Range,
     slice::SliceIndex,
@@ -49,12 +48,14 @@ pub trait Write<T> {
 }
 
 /// Represents a named region in memory
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Region {
     Charset,
     Program,
     Screen,
     Stack,
+    Count,
 }
 
 impl Display for Region {
@@ -67,6 +68,7 @@ impl Display for Region {
                 Region::Program => "program",
                 Region::Screen => "screen",
                 Region::Stack => "stack",
+                _ => "",
             }
         )
     }
@@ -76,7 +78,7 @@ impl Display for Region {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Bus {
     memory: Vec<u8>,
-    region: HashMap<Region, Range<usize>>,
+    region: [Option<Range<usize>>; Region::Count as usize],
 }
 
 impl Bus {
@@ -153,7 +155,9 @@ impl Bus {
     /// ```
     pub fn add_region(mut self, name: Region, range: Range<usize>) -> Self {
         self.with_size(range.end);
-        self.region.insert(name, range);
+        if let Some(region) = self.region.get_mut(name as usize) {
+            *region = Some(range);
+        }
         self
     }
     /// Loads data into a named region
@@ -242,7 +246,7 @@ impl Bus {
     ///# }
     /// ```
     pub fn get_region(&self, name: Region) -> Option<&[u8]> {
-        self.get(self.region.get(&name)?.clone())
+        self.get(self.region.get(name as usize)?.clone()?)
     }
 
     /// Gets a mutable slice of a named region of memory
@@ -257,7 +261,7 @@ impl Bus {
     ///# }
     /// ```
     pub fn get_region_mut(&mut self, name: Region) -> Option<&mut [u8]> {
-        self.get_mut(self.region.get(&name)?.clone())
+        self.get_mut(self.region.get(name as usize)?.clone()?)
     }
 
     /// Prints the region of memory called `Screen` at 1bpp using box characters

@@ -4,7 +4,7 @@ cover:
     cargo llvm-cov --open --doctests
 
 test:
-    cargo test --all
+    cargo test --doc && cargo nextest run
 
 tokei:
     tokei --exclude tests/chip8-test-suite
