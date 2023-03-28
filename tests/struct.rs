@@ -10,6 +10,159 @@ fn chip8() {
     println!("{ch8:?}"); // Debug
 }
 
+mod bus {
+    use super::*;
+    mod region {
+        use super::*;
+        //  #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[test]
+        fn copy() {
+            let r1 = Screen;
+            let r2 = r1;
+            assert_eq!(r1, r2);
+        }
+        #[test]
+        fn clone() {
+            let r1 = Screen;
+            let r2 = r1.clone();
+            assert_eq!(r1, r2);
+        }
+        #[test]
+        fn display() {
+            println!("{Charset}{Program}{Screen}{Stack}{Count}");
+        }
+        #[test]
+        fn debug() {
+            println!("{Charset:?}{Program:?}{Screen:?}{Stack:?}{Count:?}");
+        }
+        // lmao the things you do for test coverage
+        #[test]
+        fn eq() {
+            assert_eq!(Screen, Screen);
+            assert_ne!(Charset, Program);
+        }
+        #[test]
+        fn ord() {
+            assert_eq!(Stack, Charset.max(Program).max(Screen).max(Stack));
+            assert!(Charset < Program && Program < Screen && Screen < Stack);
+        }
+        #[test]
+        fn hash() {
+            let mut hasher = DefaultHasher::new();
+            Stack.hash(&mut hasher);
+            println!("{hasher:?}");
+        }
+    }
+    #[test]
+    #[should_panic]
+    fn bus_missing_region() {
+        // Print the screen of a bus with no screen
+        bus! {}.print_screen().unwrap()
+    }
+}
+
+mod cpu {
+    use super::*;
+    #[test]
+    fn set_break() {
+        let mut cpu = CPU::default();
+        let point = 0x234;
+        assert_eq!(cpu.breakpoints(), &[]);
+        // Attempt to set the same breakpoint 100 times
+        for _ in 0..100 {
+            cpu.set_break(point);
+        }
+        assert_eq!(cpu.breakpoints(), &[point]);
+    }
+    #[test]
+    fn unset_break() {
+        let mut cpu = CPU::default();
+        let point = 0x234;
+        // set TWO breakpoints
+        cpu.set_break(point + 1);
+        cpu.set_break(point);
+        assert_eq!(cpu.breakpoints(), &[point + 1, point]);
+        // Attempt to unset the same breakpoint 100 times
+        for _ in 0..100 {
+            cpu.unset_break(point);
+        }
+        // Only unset the matching point
+        assert_eq!(cpu.breakpoints(), &[point + 1]);
+    }
+    mod controlflags {
+        use super::*;
+        //#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[test]
+        fn clone() {
+            let cf1 = ControlFlags {
+                debug: false,
+                pause: false,
+                keypause: false,
+                vbi_wait: false,
+                lastkey: None,
+                quirks: Default::default(),
+                monotonic: None,
+            };
+            let cf2 = cf1.clone();
+            assert_eq!(cf1, cf2)
+        }
+        #[test]
+        fn debug() {
+            println!("{:?}", ControlFlags::default());
+        }
+        #[test]
+        fn default() {
+            assert_eq!(
+                ControlFlags::default(),
+                ControlFlags {
+                    debug: false,
+                    pause: false,
+                    keypause: false,
+                    vbi_wait: false,
+                    lastkey: Default::default(),
+                    quirks: Default::default(),
+                    monotonic: Default::default()
+                }
+            )
+        }
+        #[test]
+        fn eq() {
+            let cf1 = ControlFlags::default();
+            let cf2 = ControlFlags {
+                debug: true,
+                pause: true,
+                keypause: true,
+                vbi_wait: true,
+                lastkey: Default::default(),
+                quirks: Default::default(),
+                monotonic: Default::default(),
+            };
+            assert_ne!(cf1, cf2);
+        }
+        #[test]
+        fn ord() {
+            let cf1 = ControlFlags::default();
+            let cf2 = ControlFlags {
+                debug: true,
+                pause: true,
+                keypause: true,
+                vbi_wait: true,
+                lastkey: Default::default(),
+                quirks: Default::default(),
+                monotonic: Default::default(),
+            };
+            assert!(cf1 < cf2);
+            assert_eq!(ControlFlags::default(), cf1.min(cf2));
+        }
+        #[test]
+        fn hash() {
+            let mut hasher = DefaultHasher::new();
+            ControlFlags::default().hash(&mut hasher);
+            println!("{:?}", hasher);
+        }
+    }
+}
+
 #[test]
 fn error() {
     let error = chirp::error::Error::FunkyMath {
@@ -115,10 +268,9 @@ mod framebuffer_format {
     }
     #[test]
     fn hash() {
-        println!(
-            "{:?}",
-            FrameBufferFormat::default().hash(&mut DefaultHasher::new())
-        );
+        let mut hasher = DefaultHasher::new();
+        FrameBufferFormat::default().hash(&mut hasher);
+        println!("{hasher:?}");
     }
 }
 
@@ -153,10 +305,9 @@ mod framebuffer {
 
     #[test]
     fn hash() {
-        println!(
-            "{:?}",
-            FrameBuffer::default().hash(&mut DefaultHasher::new())
-        );
+        let mut hasher = DefaultHasher::new();
+        FrameBuffer::default().hash(&mut hasher);
+        println!("{hasher:?}");
     }
 }
 
@@ -225,6 +376,8 @@ mod quirks {
 
     #[test]
     fn hash() {
-        println!("{:?}", Quirks::from(true).hash(&mut DefaultHasher::new()));
+        let mut hasher = DefaultHasher::new();
+        Quirks::from(true).hash(&mut hasher);
+        println!("{hasher:?}");
     }
 }

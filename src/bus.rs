@@ -51,10 +51,15 @@ pub trait Write<T> {
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Region {
+    /// Character ROM (but writable!)
     Charset,
+    /// Program memory
     Program,
+    /// Screen buffer
     Screen,
+    /// Stack space
     Stack,
+    /// Total number of named regions
     Count,
 }
 
@@ -187,6 +192,17 @@ impl Bus {
     ///     let bus = Bus::new()
     ///         .add_region(Program, 0..1234)
     ///         .clear_region(Program);
+    ///# // TODO: test if region actually clear
+    ///#    Ok(())
+    ///# }
+    /// ```
+    /// If the region doesn't exist, that's okay.
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let bus = Bus::new()
+    ///         .add_region(Program, 0..1234)
+    ///         .clear_region(Screen);
     ///# // TODO: test if region actually clear
     ///#    Ok(())
     ///# }

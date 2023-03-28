@@ -314,6 +314,20 @@ impl CPU {
         self
     }
 
+    /// Gets a slice of breakpoints
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     assert_eq!(cpu.breakpoints(), &[]);
+    ///#    Ok(())
+    ///# }
+    /// ```
+    pub fn breakpoints(&self) -> &[Adr] {
+        &self.breakpoints.as_slice()
+    }
+
     /// Unpauses the emulator for a single tick,
     /// even if cpu.flags.pause is set.
     ///

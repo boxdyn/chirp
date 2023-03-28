@@ -171,7 +171,7 @@ impl Disassemble {
                 0x65 => self.dma_load(x),
                 _ => self.unimplemented(opcode),
             },
-            _ => unimplemented!("Extracted nibble from byte, got >nibble?"),
+            _ => unreachable!("Extracted nibble from byte, got >nibble?"),
         }
     }
 }
