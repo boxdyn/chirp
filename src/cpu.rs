@@ -74,10 +74,35 @@ pub struct ControlFlags {
 
 impl ControlFlags {
     /// Toggles debug mode
+    ///
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     assert_eq!(true, cpu.flags.debug);
+    ///     cpu.flags.debug();
+    ///     assert_eq!(false, cpu.flags.debug);
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn debug(&mut self) {
         self.debug = !self.debug
     }
+
     /// Toggles pause
+    ///
+    /// # Examples
+    /// ```rust
+    ///# use chirp::prelude::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut cpu = CPU::default();
+    ///     assert_eq!(false, cpu.flags.pause);
+    ///     cpu.flags.pause();
+    ///     assert_eq!(true, cpu.flags.pause);
+    ///#    Ok(())
+    ///# }
+    /// ```
     pub fn pause(&mut self) {
         self.pause = !self.pause
     }

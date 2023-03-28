@@ -309,8 +309,9 @@ impl Disassemble {
     }
     /// `Dxyn`: Draws n-byte sprite to the screen at coordinates (vX, vY)
     pub fn draw(&self, x: Reg, y: Reg, n: Nib) -> String {
-        #[rustfmt::skip]
-        format!("draw   #{n:x}, v{x:X}, v{y:X}").style(self.normal).to_string()
+        format!("draw   #{n:x}, v{x:X}, v{y:X}")
+            .style(self.normal)
+            .to_string()
     }
     /// `Ex9E`: Skip next instruction if key == #X
     pub fn skip_if_key_equals_x(&self, x: Reg) -> String {

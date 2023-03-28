@@ -4,6 +4,13 @@
 //! Tests for cpu.rs
 //!
 //! These run instructions, and ensure their output is consistent with previous builds
+//!
+//! General test format:
+//! 1. Prepare to do the thing
+//! 2. Do the thing
+//! 3. Compare the result to the expected result
+//!
+//! Some of these tests run >16M times, which is very silly
 
 use super::*;
 pub(self) use crate::{
@@ -25,8 +32,8 @@ fn setup_environment() -> (CPU, Bus) {
         bus! {
             // Load the charset into ROM
             Charset [0x0050..0x00A0] = include_bytes!("../mem/charset.bin"),
-            // Load the ROM file into RAM
-            Program [0x0200..0x1000] = include_bytes!("../../chip-8/BC_test.ch8"),
+            // Load the ROM file into RAM (dummy binary which contains nothing but `jmp pc+2`)
+            Program [0x0200..0x1000] = include_bytes!("tests/roms/jumptest.ch8"),
             // Create a screen
             Screen  [0x0F00..0x1000] = include_bytes!("../../chip-8/IBM Logo.ch8"),
         },
@@ -38,15 +45,37 @@ fn print_screen(bytes: &[u8]) {
 }
 
 /// Unused instructions
-///
-/// TODO: Exhaustively test unused instructions
-#[test]
-#[should_panic]
-fn unimplemented() {
-    let (mut cpu, mut bus) = setup_environment();
-    bus.write(0x200u16, 0xffffu16); // 0xffff is not an instruction
-    cpu.tick(&mut bus);
-    cpu.unimplemented(0xffff);
+mod unimplemented {
+    use super::*;
+    #[test]
+    #[should_panic]
+    fn ins_5xyn() {
+        let (mut cpu, mut bus) = setup_environment();
+        bus.write(0x200u16, 0x500fu16); // 0x500f is not an instruction
+        cpu.tick(&mut bus);
+    }
+    #[test]
+    #[should_panic]
+    fn ins_8xyn() {
+        let (mut cpu, mut bus) = setup_environment();
+        bus.write(0x200u16, 0x800fu16); // 0x800f is not an instruction
+        cpu.tick(&mut bus);
+    }
+    #[test]
+    #[should_panic]
+    fn ins_9xyn() {
+        let (mut cpu, mut bus) = setup_environment();
+        bus.write(0x200u16, 0x900fu16); // 0x800f is not an instruction
+        cpu.tick(&mut bus);
+    }
+    // Fxbb
+    #[test]
+    #[should_panic]
+    fn ins_fxbb() {
+        let (mut cpu, mut bus) = setup_environment();
+        bus.write(0x200u16, 0xffffu16); // 0xffff is not an instruction
+        cpu.tick(&mut bus);
+    }
 }
 
 mod sys {
@@ -133,12 +162,12 @@ mod cf {
             for x in 0..=0xf {
                 // set the PC to a random address
                 cpu.pc = addr;
-                // set the register under test to a
+
                 cpu.v[x] = a;
-                // do the thing
+
                 cpu.skip_equals_immediate(x, b);
-                // validate the result
-                assert_eq!(cpu.pc, addr.wrapping_add(if dbg!(a == b) { 2 } else { 0 }));
+
+                assert_eq!(cpu.pc, addr.wrapping_add(if a == b { 2 } else { 0 }));
             }
         }
     }
@@ -152,11 +181,11 @@ mod cf {
             for x in 0..=0xf {
                 // set the PC to a random address
                 cpu.pc = addr;
-                // set the register under test to a
+
                 cpu.v[x] = a;
-                // do the thing
+
                 cpu.skip_not_equals_immediate(x, b);
-                // validate the result
+
                 assert_eq!(cpu.pc, addr.wrapping_add(if a != b { 2 } else { 0 }));
             }
         }
@@ -175,11 +204,11 @@ mod cf {
                 }
                 // set the PC to a random address
                 cpu.pc = addr;
-                // set the registers under test to a, b
+
                 (cpu.v[x], cpu.v[y]) = (a, b);
-                // do the thing
+
                 cpu.skip_equals(x, y);
-                // validate the result
+
                 assert_eq!(cpu.pc, addr.wrapping_add(if a == b { 2 } else { 0 }));
             }
         }
@@ -198,11 +227,11 @@ mod cf {
                 }
                 // set the PC to a random address
                 cpu.pc = addr;
-                // set the registers under test to a, b
+
                 (cpu.v[x], cpu.v[y]) = (a, b);
-                // do the thing
+
                 cpu.skip_not_equals(x, y);
-                // validate the result
+
                 assert_eq!(cpu.pc, addr.wrapping_add(if a != b { 2 } else { 0 }));
             }
         }
@@ -218,9 +247,9 @@ mod cf {
             for v0 in 0..=0xff {
                 // set v[0] = v0
                 cpu.v[0] = v0;
-                // jump indexed
+
                 cpu.jump_indexed(addr);
-                // Validate register set
+
                 assert_eq!(cpu.pc, addr.wrapping_add(v0.into()));
             }
         }
@@ -248,11 +277,11 @@ mod math {
         for test_register in 0x0..=0xf {
             let mut sum = 0u8;
             for test_byte in 0x0..=0xff {
-                // Wrapping-add to the running total (Chip-8 allows unsigned overflow)
+                // Note: Chip-8 allows unsigned overflow
                 sum = sum.wrapping_add(test_byte);
-                // Perform add #byte, vReg
+
                 cpu.add_immediate(test_register, test_byte);
-                //Verify the running total in the register matches
+
                 assert_eq!(cpu.v[test_register], sum);
             }
         }
@@ -273,7 +302,9 @@ mod math {
                 cpu.v[y] = test_value;
                 // zero X
                 cpu.v[x] = 0;
+
                 cpu.load(x, y);
+
                 // verify results
                 assert_eq!(cpu.v[x], test_value);
                 assert_eq!(cpu.v[y], test_value);
@@ -292,13 +323,11 @@ mod math {
             let expected_result = a | b;
             for reg in 0..=0xff {
                 let (x, y) = (reg & 0xf, reg >> 4);
-                // set the registers under test to a, b
+
                 (cpu.v[x], cpu.v[y]) = (a, b);
 
-                // do the thing
                 cpu.or(x, y);
 
-                // validate the result
                 assert_eq!(cpu.v[x], if x == y { b } else { expected_result });
             }
         }
@@ -315,13 +344,11 @@ mod math {
             let expected_result = a & b;
             for reg in 0..=0xff {
                 let (x, y) = (reg & 0xf, reg >> 4);
-                // set the registers under test to a, b
+
                 (cpu.v[x], cpu.v[y]) = (a, b);
 
-                // do the thing
                 cpu.and(x, y);
 
-                // validate the result
                 assert_eq!(cpu.v[x], if x == y { b } else { expected_result });
             }
         }
@@ -338,13 +365,11 @@ mod math {
             let expected_result = a ^ b;
             for reg in 0..=0xff {
                 let (x, y) = (reg & 0xf, reg >> 4);
-                // set the registers under test to a, b
+
                 (cpu.v[x], cpu.v[y]) = (a, b);
 
-                // do the thing
                 cpu.xor(x, y);
 
-                // validate the result
                 assert_eq!(cpu.v[x], if x == y { 0 } else { expected_result });
             }
         }
@@ -362,13 +387,11 @@ mod math {
                 // calculate the expected result
                 // If x == y, a is discarded
                 let (expected, carry) = if x == y { b } else { a }.overflowing_add(b);
-                // set the registers under test to a, b
+
                 (cpu.v[x], cpu.v[y]) = (a, b);
 
-                // do the thing
                 cpu.add(x, y);
 
-                // validate the result
                 // if the destination is vF, the result was discarded, and only the carry was kept
                 if x != 0xf {
                     assert_eq!(cpu.v[x], expected);
@@ -388,13 +411,11 @@ mod math {
                 let (x, y) = (reg & 0xf, reg >> 4);
                 // calculate the expected result
                 let (expected, carry) = if x == y { b } else { a }.overflowing_sub(b);
-                // set the registers under test to a, b
+
                 (cpu.v[x], cpu.v[y]) = (a, b);
 
-                // do the thing
                 cpu.sub(x, y);
 
-                // validate the result
                 // if the destination is vF, the result was discarded, and only the carry was kept
                 if x != 0xf {
                     assert_eq!(cpu.v[x], expected);
@@ -414,10 +435,9 @@ mod math {
             for x in 0..=0xf {
                 // set the register under test to `word`
                 cpu.v[x] = word;
-                // do the thing
+
                 cpu.shift_right(x, x);
 
-                // validate the result
                 // if the destination is vF, the result was discarded, and only the carry was kept
                 if x != 0xf {
                     assert_eq!(cpu.v[x], word >> 1);
@@ -438,13 +458,10 @@ mod math {
                 let (x, y) = (reg & 0xf, reg >> 4);
                 // calculate the expected result
                 let (expected, carry) = if x == y { a } else { b }.overflowing_sub(a);
-                // set the registers under test to a, b
                 (cpu.v[x], cpu.v[y]) = (a, b);
 
-                // do the thing
                 cpu.backwards_sub(x, y);
 
-                // validate the result
                 // if the destination is vF, the result was discarded, and only the carry was kept
                 if x != 0xf {
                     assert_eq!(cpu.v[x], expected);
@@ -464,10 +481,9 @@ mod math {
             for x in 0..=0xf {
                 // set the register under test to `word`
                 cpu.v[x] = word;
-                // do the thing
+
                 cpu.shift_left(x, x);
 
-                // validate the result
                 // if the destination is vF, the result was discarded, and only the carry was kept
                 if x != 0xf {
                     assert_eq!(cpu.v[x], word << 1);
@@ -523,15 +539,21 @@ mod io {
 
     use super::*;
     /// Cxbb: Stores a random number & the provided byte into vX
-    //#[test]
-    #[allow(dead_code)]
+    #[test]
     fn rand() {
-        todo!()
+        let (mut cpu, _) = setup_environment();
+        for xb in 0..0x100fff {
+            let (x, b) = ((xb >> 8) % 16, xb as u8);
+            cpu.v[x] = 0;
+            cpu.rand(x, b);
+            // We don't know what the number will be,
+            // but we do know it'll be <= b
+            assert!(cpu.v[x] <= b);
+        }
     }
 
     mod display {
         use super::*;
-        #[derive(Debug)]
         struct ScreenTest {
             program: &'static [u8],
             screen: &'static [u8],
@@ -542,7 +564,7 @@ mod io {
         const SCREEN_TESTS: [ScreenTest; 4] = [
             // Passing BC_test
             // # Quirks:
-            // - Requires
+            // - Requires shift and dma_inc to act like Super-CHIP
             ScreenTest {
                 program: include_bytes!("../../chip-8/BC_test.ch8"),
                 screen: include_bytes!("tests/screens/BC_test.ch8/197.bin"),
@@ -551,21 +573,21 @@ mod io {
                     bin_ops: true,
                     shift: false,
                     draw_wait: true,
-
                     dma_inc: false,
                     stupid_jumps: false,
                 },
             },
             // The IBM Logo
+            // # Quirks
+            // Originally timed without quirks
             ScreenTest {
                 program: include_bytes!("../../chip-8/IBM Logo.ch8"),
                 screen: include_bytes!("tests/screens/IBM Logo.ch8/20.bin"),
-                steps: 20,
+                steps: 56,
                 quirks: Quirks {
                     bin_ops: true,
                     shift: true,
-                    draw_wait: false,
-
+                    draw_wait: true,
                     dma_inc: true,
                     stupid_jumps: false,
                 },
@@ -623,26 +645,94 @@ mod io {
     }
 
     mod cf {
-        //use super::*;
+        use super::*;
         /// Ex9E: Skip next instruction if key == #X
-        //#[test]
-        #[allow(dead_code)]
+        #[test]
         fn skip_key_equals() {
-            todo!()
+            let (mut cpu, _) = setup_environment();
+            for ka in 0..=0x7fef {
+                let (key, addr) = ((ka & 0xf) as u8, ka >> 8);
+                // positive test (no keys except key pressed)
+                cpu.keys = [false; 16]; // unset all keys
+                cpu.keys[key as usize] = true; // except the one we care about
+                for x in 0..=0xf {
+                    cpu.pc = addr;
+                    cpu.v[x] = key;
+                    cpu.skip_key_equals(x);
+                    assert_eq!(cpu.pc, addr.wrapping_add(2));
+                    cpu.v[x] = 0xff;
+                }
+                // negative test (all keys except key pressed)
+                cpu.keys = [true; 16]; // set all keys
+                cpu.keys[key as usize] = false; // except the one we care about
+                for x in 0..=0xf {
+                    cpu.pc = addr;
+                    cpu.v[x] = key;
+                    cpu.skip_key_equals(x);
+                    assert_eq!(cpu.pc, addr);
+                    cpu.v[x] = 0xff;
+                }
+            }
         }
 
         /// ExaE: Skip next instruction if key != #X
-        //#[test]
-        #[allow(dead_code)]
+        #[test]
         fn skip_key_not_equals() {
-            todo!()
+            let (mut cpu, _) = setup_environment();
+            for ka in 0..=0x7fcf {
+                let (key, addr) = ((ka & 0xf) as u8, ka >> 8);
+                // positive test (no keys except key pressed)
+                cpu.keys = [false; 16]; // unset all keys
+                cpu.keys[key as usize] = true; // except the one we care about
+                for x in 0..=0xf {
+                    cpu.pc = addr;
+                    cpu.v[x] = key;
+                    cpu.skip_key_not_equals(x);
+                    assert_eq!(cpu.pc, addr);
+                    cpu.v[x] = 0xff;
+                }
+                // negative test (all keys except key pressed)
+                cpu.keys = [true; 16]; // set all keys
+                cpu.keys[key as usize] = false; // except the one we care about
+                for x in 0..=0xf {
+                    cpu.pc = addr;
+                    cpu.v[x] = key;
+                    cpu.skip_key_not_equals(x);
+                    assert_eq!(cpu.pc, addr.wrapping_add(2));
+                    cpu.v[x] = 0xff;
+                }
+            }
         }
 
         /// Fx0A: Wait for key, then vX = K
-        //#[test]
-        #[allow(dead_code)]
+        ///
+        /// The write happens on key *release*
+        #[test]
         fn wait_for_key() {
-            todo!()
+            let (mut cpu, _) = setup_environment();
+            for key in 0..0xf {
+                for x in 0..0xf {
+                    cpu.v[x] = 0xff;
+                    cpu.wait_for_key(x);
+                    assert_eq!(true, cpu.flags.keypause);
+                    assert_eq!(0xff, cpu.v[x]);
+                    // There are three parts to a button press
+                    // When the button is pressed
+                    cpu.press(key);
+                    assert_eq!(true, cpu.flags.keypause);
+                    assert_eq!(0xff, cpu.v[x]);
+                    // When the button is held
+                    cpu.wait_for_key(x);
+                    assert_eq!(true, cpu.flags.keypause);
+                    assert_eq!(0xff, cpu.v[x]);
+                    // And when the button is released!
+                    cpu.release(key);
+                    assert_eq!(false, cpu.flags.keypause);
+                    assert_eq!(Some(key), cpu.flags.lastkey);
+                    cpu.wait_for_key(x);
+                    assert_eq!(key as u8, cpu.v[x]);
+                }
+            }
         }
     }
 
@@ -654,9 +744,9 @@ mod io {
             for x in 0..=0xf {
                 // set the register under test to `word`
                 cpu.delay = word as f64;
-                // do the thing
+
                 cpu.load_delay_timer(x);
-                // validate the result
+
                 assert_eq!(cpu.v[x], word);
             }
         }
@@ -670,9 +760,9 @@ mod io {
             for x in 0..=0xf {
                 // set the register under test to `word`
                 cpu.v[x] = word;
-                // do the thing
+
                 cpu.store_delay_timer(x);
-                // validate the result
+
                 assert_eq!(cpu.delay, word as f64);
             }
         }
@@ -680,15 +770,15 @@ mod io {
 
     /// Fx18: Load vX into ST
     #[test]
-    fn load_sound_timer() {
+    fn store_sound_timer() {
         let (mut cpu, _) = setup_environment();
         for word in 0..=0xff {
             for x in 0..=0xf {
                 // set the register under test to `word`
                 cpu.v[x] = word;
-                // do the thing
+
                 cpu.store_sound_timer(x);
-                // validate the result
+
                 assert_eq!(cpu.sound, word as f64);
             }
         }
@@ -724,7 +814,6 @@ mod io {
 
         /// Fx29: Load sprite for character vX into I
         #[test]
-        #[allow(dead_code)]
         fn load_sprite() {
             let (mut cpu, bus) = setup_environment();
             for test in TESTS {
@@ -735,15 +824,7 @@ mod io {
                 cpu.load_sprite(reg);
 
                 let addr = cpu.i as usize;
-                assert_eq!(
-                    bus.get(addr..addr.wrapping_add(5)).unwrap(),
-                    test.output,
-                    "\nTesting load_sprite({:x}) -> {:04x} {{\n\tout:{:02x?}\n\texp:{:02x?}\n}}",
-                    test.input,
-                    cpu.i,
-                    bus.get(addr..addr.wrapping_add(5)).unwrap(),
-                    test.output,
-                );
+                assert_eq!(bus.get(addr..addr.wrapping_add(5)).unwrap(), test.output,);
             }
         }
     }
@@ -775,7 +856,6 @@ mod io {
 
         /// Fx33: BCD convert X into I`[0..3]`
         #[test]
-        #[allow(dead_code)]
         fn bcd_convert() {
             for test in BCD_TESTS {
                 let (mut cpu, mut bus) = setup_environment();
@@ -785,7 +865,7 @@ mod io {
                 cpu.v[5] = test.input;
 
                 cpu.bcd_convert(5, &mut bus);
-                // validate the results
+
                 assert_eq!(bus.get(addr..addr.saturating_add(3)), Some(test.output))
             }
         }
@@ -794,7 +874,6 @@ mod io {
     /// Fx55: DMA Stor from I to registers 0..X
     // TODO: Test with dma_inc quirk set
     #[test]
-    #[allow(dead_code)]
     fn dma_store() {
         let (mut cpu, mut bus) = setup_environment();
         const DATA: &[u8] = b"ABCDEFGHIJKLMNOP";
@@ -817,7 +896,6 @@ mod io {
     /// Fx65: DMA Load from I to registers 0..X
     // TODO: Test with dma_inc quirk set
     #[test]
-    #[allow(dead_code)]
     fn dma_load() {
         let (mut cpu, mut bus) = setup_environment();
         const DATA: &[u8] = b"ABCDEFGHIJKLMNOP";

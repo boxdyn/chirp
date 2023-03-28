@@ -266,6 +266,7 @@ pub fn identify_key(key: Key) -> usize {
     }
 }
 
+#[cfg_attr(feature = "unstable", no_coverage)]
 pub fn debug_dump_screen(ch8: &Chip8, rom: &Path) -> Result<()> {
     let path = PathBuf::new()
         .join("src/cpu/tests/screens/")

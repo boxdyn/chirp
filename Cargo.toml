@@ -6,20 +6,21 @@ authors = ["John Breaux"]
 license = "MIT"
 
 [features]
-default = []
+default = ["unstable"]
+unstable = []
 rhexdump = ["dep:rhexdump"]
 serde = ["dep:serde"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [profile.release]
-opt-level = 'z'
+opt-level = 3
 debug = false
 rpath = false
 lto = true
 debug-assertions = false
 codegen-units = 1
 panic = 'unwind'
-incremental = true
+incremental = false
 overflow-checks = false
 
 
