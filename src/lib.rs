@@ -19,7 +19,7 @@ pub struct Chip8 {
     pub bus: bus::Bus,
 }
 
-/// Common imports for chumpulator
+/// Common imports for Chirp
 pub mod prelude {
     pub use super::Chip8;
     use super::*;

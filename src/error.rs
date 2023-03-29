@@ -1,7 +1,7 @@
 // (c) 2023 John A. Breaux
 // This code is licensed under MIT license (see LICENSE.txt for details)
 
-//! Error type for chumpulator
+//! Error type for Chirp
 
 use thiserror::Error;
 
