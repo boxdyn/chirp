@@ -1032,7 +1032,7 @@ impl CPU {
     }
 }
 
-// | Cxbb | Stores a random number + the provided byte into vX
+// | Cxbb | Stores a random number & the provided byte into vX
 impl CPU {
     /// Cxbb: Stores a random number & the provided byte into vX
     #[inline]
@@ -1080,10 +1080,10 @@ impl CPU {
 //
 // |opcode| effect                             |
 // |------|------------------------------------|
-// | eX9e | Skip next instruction if key == #X |
-// | eXa1 | Skip next instruction if key != #X |
+// | eX9e | Skip next instruction if key == vX |
+// | eXa1 | Skip next instruction if key != vX |
 impl CPU {
-    /// Ex9E: Skip next instruction if key == #X
+    /// Ex9E: Skip next instruction if key == vX
     #[inline]
     fn skip_key_equals(&mut self, x: Reg) {
         let x = self.v[x] as usize;
@@ -1091,7 +1091,7 @@ impl CPU {
             self.pc += 2;
         }
     }
-    /// ExaE: Skip next instruction if key != #X
+    /// ExaE: Skip next instruction if key != vX
     #[inline]
     fn skip_key_not_equals(&mut self, x: Reg) {
         let x = self.v[x] as usize;
@@ -1106,14 +1106,14 @@ impl CPU {
 // |opcode| effect                             |
 // |------|------------------------------------|
 // | fX07 | Set vX to value in delay timer     |
-// | fX0a | Wait for input, store in vX m      |
+// | fX0a | Wait for input, store key in vX    |
 // | fX15 | Set sound timer to the value in vX |
 // | fX18 | set delay timer to the value in vX |
-// | fX1e | Add x to I                         |
+// | fX1e | Add vX to I                        |
 // | fX29 | Load sprite for character x into I |
 // | fX33 | BCD convert X into I[0..3]         |
-// | fX55 | DMA Stor from I to registers 0..X  |
-// | fX65 | DMA Load from I to registers 0..X  |
+// | fX55 | DMA Stor from I to registers 0..=X |
+// | fX65 | DMA Load from I to registers 0..=X |
 impl CPU {
     /// Fx07: Get the current DT, and put it in vX
     /// ```py
@@ -1174,7 +1174,7 @@ impl CPU {
         bus.write(self.i.wrapping_add(1), x / 10 % 10);
         bus.write(self.i, x / 100 % 10);
     }
-    /// Fx55: DMA Stor from I to registers 0..X
+    /// Fx55: DMA Stor from I to registers 0..=X
     ///
     /// # Quirk
     /// The original chip-8 interpreter uses I to directly index memory,
@@ -1194,7 +1194,7 @@ impl CPU {
             self.i += x as Adr + 1;
         }
     }
-    /// Fx65: DMA Load from I to registers 0..X
+    /// Fx65: DMA Load from I to registers 0..=X
     ///
     /// # Quirk
     /// The original chip-8 interpreter uses I to directly index memory,
