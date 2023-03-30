@@ -580,7 +580,6 @@ impl CPU {
         };
 
         // Print opcode disassembly:
-
         if self.flags.debug {
             println!("{:?}", self.timers.insn.elapsed().bright_black());
             self.timers.insn = Instant::now();

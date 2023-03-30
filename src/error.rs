@@ -15,7 +15,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 pub enum Error {
     /// Represents an unimplemented operation
-    #[error("Unrecognized opcode {word}")]
+    #[error("Unrecognized opcode: {word:04x}")]
     UnimplementedInstruction {
         /// The offending word
         word: u16,
@@ -27,7 +27,7 @@ pub enum Error {
         region: Region,
     },
     /// Tried to fetch [Range] from bus, received nothing
-    #[error("Invalid range {range:?} for bus")]
+    #[error("Invalid range {range:04x?} for bus")]
     InvalidBusRange {
         /// The offending [Range]
         range: Range<usize>,

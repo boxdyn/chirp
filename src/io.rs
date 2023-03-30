@@ -151,6 +151,9 @@ impl UI {
                     (1.0 / self.time.elapsed().as_secs_f64()).trunc()
                 ));
             }
+            if !self.window.is_open() {
+                std::process::exit(0);
+            }
             self.time = Instant::now();
             // update framebuffer
             self.fb.render(&mut self.window, &mut ch8.bus);

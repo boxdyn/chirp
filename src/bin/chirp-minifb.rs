@@ -6,6 +6,7 @@
 
 use chirp::{error::Result, prelude::*};
 use gumdrop::*;
+use owo_colors::OwoColorize;
 use std::fs::read;
 use std::{
     path::PathBuf,
@@ -23,11 +24,12 @@ struct Arguments {
     #[options(help = "Enable pause mode at startup.")]
     pub pause: bool,
 
-    #[options(help = "Set the instructions-per-frame rate.")]
+    #[options(help = "Set the instructions-per-delay rate, or use realtime.")]
     pub speed: Option<usize>,
-    #[options(help = "Run the emulator as fast as possible for `step` instructions.")]
+    #[options(help = "Set the instructions-per-frame rate.")]
     pub step: Option<usize>,
-
+    #[options(help = "Enable performance benchmarking on stderr (requires -S)")]
+    pub perf: bool,
     #[options(
         short = "z",
         help = "Disable setting vF to 0 after a bitwise operation."
@@ -77,6 +79,7 @@ struct State {
     pub speed: usize,
     pub step: Option<usize>,
     pub rate: u64,
+    pub perf: bool,
     pub ch8: Chip8,
     pub ui: UI,
     pub ft: Instant,
@@ -88,6 +91,7 @@ impl State {
             speed: options.speed.unwrap_or(8),
             step: options.step,
             rate: options.frame_rate,
+            perf: options.perf,
             ch8: Chip8 {
                 bus: bus! {
                     // Load the charset into ROM
@@ -140,16 +144,15 @@ impl State {
                 Some(ticks) => {
                     let time = Instant::now();
                     self.ch8.cpu.multistep(&mut self.ch8.bus, ticks)?;
-                    let time = time.elapsed();
-                    let nspt = time.as_secs_f64() / ticks as f64;
-                    eprintln!(
-                        "{ticks},\t{time:.05?},\t{:.4}nspt,\t{}ipf",
-                        nspt * 1_000_000_000.0,
-                        ((1.0 / 60.0f64) / nspt).trunc(),
-                    );
-                    // Pause the CPU and clear step
-                    //self.ch8.cpu.flags.pause = true;
-                    //self.step = None;
+                    if self.perf {
+                        let time = time.elapsed();
+                        let nspt = time.as_secs_f64() / ticks as f64;
+                        eprintln!(
+                            "{ticks},\t{time:.05?},\t{:.4}nspt,\t{}ipf",
+                            nspt * 1_000_000_000.0,
+                            ((1.0 / 60.0f64) / nspt).trunc(),
+                        );
+                    }
                 }
                 None => {
                     self.ch8.cpu.multistep(&mut self.ch8.bus, rate)?;
@@ -166,21 +169,33 @@ impl State {
 }
 
 impl Iterator for State {
-    type Item = ();
+    type Item = Result<()>;
 
+    /// Pretty heavily abusing iterators here, in an annoying way
     fn next(&mut self) -> Option<Self::Item> {
         self.wait_for_next_frame();
-        self.keys().unwrap_or_else(|_| None)?;
-        self.tick_cpu().ok()?;
-        self.frame();
-        Some(())
+        match self.keys() {
+            Ok(opt) => opt?,
+            Err(e) => return Some(Err(e)), // summary
+        }
+        self.keys().unwrap_or(None)?;
+        if let Err(e) = self.tick_cpu() {
+            return Some(Err(e));
+        }
+        self.frame()?;
+        Some(Ok(()))
     }
 }
 
 fn main() -> Result<()> {
     let options = Arguments::parse_args_default_or_exit();
     let state = State::new(options)?;
-    Ok(for _ in state {})
+    Ok(for result in state {
+        if let Err(e) = result {
+            eprintln!("{}", e.bold().red());
+            break;
+        }
+    })
 }
 
 /// Parses a hexadecimal string into a u16
