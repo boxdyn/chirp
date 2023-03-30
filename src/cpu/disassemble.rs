@@ -87,15 +87,15 @@ impl Disassemble {
             // | 2aaa | Pushes pc onto the stack, then jumps to a
             0x2 => self.call(a),
             // | 3xbb | Skips next instruction if register X == b
-            0x3 => self.skip_if_x_equal_byte(x, b),
+            0x3 => self.skip_equals_immediate(x, b),
             // | 4xbb | Skips next instruction if register X != b
-            0x4 => self.skip_if_x_not_equal_byte(x, b),
+            0x4 => self.skip_not_equals_immediate(x, b),
             // # Performs a register-register comparison
             // |opcode| effect                             |
             // |------|------------------------------------|
             // | 9XY0 | Skip next instruction if vX == vY  |
             0x5 => match n {
-                0x0 => self.skip_if_x_equal_y(x, y),
+                0x0 => self.skip_equals(x, y),
                 _ => self.unimplemented(opcode),
             },
             // 6xbb: Loads immediate byte b into register vX
@@ -115,15 +115,15 @@ impl Disassemble {
             // | 8xy7 | X = Y - X; Set vF=carry            |
             // | 8xyE | X = X << 1                         |
             0x8 => match n {
-                0x0 => self.load_y_into_x(x, y),
-                0x1 => self.x_orequals_y(x, y),
-                0x2 => self.x_andequals_y(x, y),
-                0x3 => self.x_xorequals_y(x, y),
-                0x4 => self.x_addequals_y(x, y),
-                0x5 => self.x_subequals_y(x, y),
-                0x6 => self.shift_right_x(x),
-                0x7 => self.backwards_subtract(x, y),
-                0xE => self.shift_left_x(x),
+                0x0 => self.load(x, y),
+                0x1 => self.or(x, y),
+                0x2 => self.and(x, y),
+                0x3 => self.xor(x, y),
+                0x4 => self.add(x, y),
+                0x5 => self.sub(x, y),
+                0x6 => self.shift_right(x),
+                0x7 => self.backwards_sub(x, y),
+                0xE => self.shift_left(x),
                 _ => self.unimplemented(opcode),
             },
             // # Performs a register-register comparison
@@ -131,11 +131,11 @@ impl Disassemble {
             // |------|------------------------------------|
             // | 9XY0 | Skip next instruction if vX != vY  |
             0x9 => match n {
-                0 => self.skip_if_x_not_equal_y(x, y),
+                0 => self.skip_not_equals(x, y),
                 _ => self.unimplemented(opcode),
             },
             // Aaaa: Load address #a into register I
-            0xa => self.load_indirect_register(a),
+            0xa => self.load_i_immediate(a),
             // Baaa: Jump to &adr + v0
             0xb => self.jump_indexed(a),
             // Cxbb: Stores a random number + the provided byte into vX
@@ -149,8 +149,8 @@ impl Disassemble {
             // | eX9e | Skip next instruction if key == #X |
             // | eXa1 | Skip next instruction if key != #X |
             0xe => match b {
-                0x9e => self.skip_if_key_equals_x(x),
-                0xa1 => self.skip_if_key_not_x(x),
+                0x9e => self.skip_key_equals(x),
+                0xa1 => self.skip_key_not_equals(x),
                 _ => self.unimplemented(opcode),
             },
 
@@ -167,15 +167,15 @@ impl Disassemble {
             // | fX55 | DMA Stor from I to registers 0..X  |
             // | fX65 | DMA Load from I to registers 0..X  |
             0xf => match b {
-                0x07 => self.get_delay_timer(x),
+                0x07 => self.load_delay_timer(x),
                 0x0A => self.wait_for_key(x),
-                0x15 => self.load_delay_timer(x),
-                0x18 => self.load_sound_timer(x),
+                0x15 => self.store_delay_timer(x),
+                0x18 => self.store_sound_timer(x),
                 0x1E => self.add_to_indirect(x),
-                0x29 => self.load_sprite_x(x),
-                0x33 => self.bcd_convert_i(x),
-                0x55 => self.dma_store(x),
-                0x65 => self.dma_load(x),
+                0x29 => self.load_sprite(x),
+                0x33 => self.bcd_convert(x),
+                0x55 => self.store_dma(x),
+                0x65 => self.load_dma(x),
                 _ => self.unimplemented(opcode),
             },
             _ => unreachable!("Extracted nibble from byte, got >nibble?"),
@@ -212,19 +212,19 @@ impl Disassemble {
         format!("call   {a:03x}").style(self.normal).to_string()
     }
     /// `3xbb`: Skips the next instruction if register X == b
-    pub fn skip_if_x_equal_byte(&self, x: Reg, b: u8) -> String {
+    pub fn skip_equals_immediate(&self, x: Reg, b: u8) -> String {
         format!("se     #{b:02x}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `4xbb`: Skips the next instruction if register X != b
-    pub fn skip_if_x_not_equal_byte(&self, x: Reg, b: u8) -> String {
+    pub fn skip_not_equals_immediate(&self, x: Reg, b: u8) -> String {
         format!("sne    #{b:02x}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `5xy0`: Skips the next instruction if register X != register Y
-    pub fn skip_if_x_equal_y(&self, x: Reg, y: Reg) -> String {
+    pub fn skip_equals(&self, x: Reg, y: Reg) -> String {
         format!("se     v{x:X}, v{y:X}")
             .style(self.normal)
             .to_string()
@@ -243,64 +243,64 @@ impl Disassemble {
             .to_string()
     }
     /// `8xy0`: Loads the value of y into x
-    pub fn load_y_into_x(&self, x: Reg, y: Reg) -> String {
+    pub fn load(&self, x: Reg, y: Reg) -> String {
         format!("mov    v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `8xy1`: Performs bitwise or of vX and vY, and stores the result in vX
-    pub fn x_orequals_y(&self, x: Reg, y: Reg) -> String {
+    pub fn or(&self, x: Reg, y: Reg) -> String {
         format!("or     v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `8xy2`: Performs bitwise and of vX and vY, and stores the result in vX
-    pub fn x_andequals_y(&self, x: Reg, y: Reg) -> String {
+    pub fn and(&self, x: Reg, y: Reg) -> String {
         format!("and    v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
 
     /// `8xy3`: Performs bitwise xor of vX and vY, and stores the result in vX
-    pub fn x_xorequals_y(&self, x: Reg, y: Reg) -> String {
+    pub fn xor(&self, x: Reg, y: Reg) -> String {
         format!("xor    v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `8xy4`: Performs addition of vX and vY, and stores the result in vX
-    pub fn x_addequals_y(&self, x: Reg, y: Reg) -> String {
+    pub fn add(&self, x: Reg, y: Reg) -> String {
         format!("add    v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `8xy5`: Performs subtraction of vX and vY, and stores the result in vX
-    pub fn x_subequals_y(&self, x: Reg, y: Reg) -> String {
+    pub fn sub(&self, x: Reg, y: Reg) -> String {
         format!("sub    v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// `8xy6`: Performs bitwise right shift of vX
-    pub fn shift_right_x(&self, x: Reg) -> String {
+    pub fn shift_right(&self, x: Reg) -> String {
         format!("shr    v{x:X}").style(self.normal).to_string()
     }
     /// `8xy7`: Performs subtraction of vY and vX, and stores the result in vX
-    pub fn backwards_subtract(&self, x: Reg, y: Reg) -> String {
+    pub fn backwards_sub(&self, x: Reg, y: Reg) -> String {
         format!("bsub   v{y:X}, v{x:X}")
             .style(self.normal)
             .to_string()
     }
     /// 8X_E: Performs bitwise left shift of vX
-    pub fn shift_left_x(&self, x: Reg) -> String {
+    pub fn shift_left(&self, x: Reg) -> String {
         format!("shl    v{x:X}").style(self.normal).to_string()
     }
     /// `9xy0`: Skip next instruction if X != y
-    pub fn skip_if_x_not_equal_y(&self, x: Reg, y: Reg) -> String {
+    pub fn skip_not_equals(&self, x: Reg, y: Reg) -> String {
         format!("sne    v{x:X}, v{y:X}")
             .style(self.normal)
             .to_string()
     }
     /// Aadr: Load address #adr into register I
-    pub fn load_indirect_register(&self, a: Adr) -> String {
+    pub fn load_i_immediate(&self, a: Adr) -> String {
         format!("mov    ${a:03x}, I").style(self.normal).to_string()
     }
     /// Badr: Jump to &adr + v0
@@ -321,18 +321,18 @@ impl Disassemble {
             .to_string()
     }
     /// `Ex9E`: Skip next instruction if key == #X
-    pub fn skip_if_key_equals_x(&self, x: Reg) -> String {
+    pub fn skip_key_equals(&self, x: Reg) -> String {
         format!("sek    v{x:X}").style(self.normal).to_string()
     }
     /// `ExaE`: Skip next instruction if key != #X
-    pub fn skip_if_key_not_x(&self, x: Reg) -> String {
+    pub fn skip_key_not_equals(&self, x: Reg) -> String {
         format!("snek   v{x:X}").style(self.normal).to_string()
     }
     /// `Fx07`: Get the current DT, and put it in vX
     /// ```py
     /// vX = DT
     /// ```
-    pub fn get_delay_timer(&self, x: Reg) -> String {
+    pub fn load_delay_timer(&self, x: Reg) -> String {
         format!("mov    DT, v{x:X}").style(self.normal).to_string()
     }
     /// `Fx0A`: Wait for key, then vX = K
@@ -343,14 +343,14 @@ impl Disassemble {
     /// ```py
     /// DT = vX
     /// ```
-    pub fn load_delay_timer(&self, x: Reg) -> String {
+    pub fn store_delay_timer(&self, x: Reg) -> String {
         format!("mov    v{x:X}, DT").style(self.normal).to_string()
     }
     /// `Fx18`: Load vX into ST
     /// ```py
     /// ST = vX;
     /// ```
-    pub fn load_sound_timer(&self, x: Reg) -> String {
+    pub fn store_sound_timer(&self, x: Reg) -> String {
         format!("mov    v{x:X}, ST").style(self.normal).to_string()
     }
     /// `Fx1e`: Add vX to I,
@@ -364,19 +364,19 @@ impl Disassemble {
     /// ```py
     /// I = sprite(X);
     /// ```
-    pub fn load_sprite_x(&self, x: Reg) -> String {
+    pub fn load_sprite(&self, x: Reg) -> String {
         format!("font   v{x:X}, I").style(self.normal).to_string()
     }
     /// `Fx33`: BCD convert X into I`[0..3]`
-    pub fn bcd_convert_i(&self, x: Reg) -> String {
+    pub fn bcd_convert(&self, x: Reg) -> String {
         format!("bcd    v{x:X}, &I").style(self.normal).to_string()
     }
     /// `Fx55`: DMA Stor from I to registers 0..X
-    pub fn dma_store(&self, x: Reg) -> String {
+    pub fn store_dma(&self, x: Reg) -> String {
         format!("dmao   v{x:X}").style(self.normal).to_string()
     }
     /// `Fx65`: DMA Load from I to registers 0..X
-    pub fn dma_load(&self, x: Reg) -> String {
+    pub fn load_dma(&self, x: Reg) -> String {
         format!("dmai   v{x:X}").style(self.normal).to_string()
     }
 }
