@@ -191,10 +191,8 @@ mod cpu {
 
 #[test]
 fn error() {
-    let error = chirp::error::Error::FunkyMath {
-        word: 0x1234,
-        explanation: "This shit was funky".to_owned(),
-    };
+    let error = chirp::error::Error::MissingRegion { region: Screen };
+    // Print it with Display and Debug
     println!("{error} {error:?}");
 }
 

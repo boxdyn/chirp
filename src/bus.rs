@@ -5,7 +5,7 @@
 //!
 //! This is more of a memory management unit + some utils for reading/writing
 
-use crate::error::Result;
+use crate::error::{Error::MissingRegion, Result};
 use std::{
     fmt::{Debug, Display, Formatter},
     ops::Range,
@@ -319,9 +319,7 @@ impl Bus {
                 }
             }
         } else {
-            return Err(crate::error::Error::MissingRegion {
-                region: REGION.to_string(),
-            });
+            return Err(MissingRegion { region: REGION });
         }
         Ok(())
     }
