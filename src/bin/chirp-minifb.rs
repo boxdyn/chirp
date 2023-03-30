@@ -104,7 +104,7 @@ impl State {
                     0x50,
                     0x200,
                     0xefe,
-                    Disassemble::default(),
+                    Dis::default(),
                     options.breakpoints,
                     ControlFlags {
                         quirks: chirp::cpu::Quirks {

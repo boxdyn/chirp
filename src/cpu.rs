@@ -6,9 +6,16 @@
 #[cfg(test)]
 mod tests;
 
-pub mod disassemble;
+/// Disassembles Chip-8 instructions
+pub trait Disassembler {
+    /// Disassemble a single instruction
+    fn once(&self, insn: u16) -> String;
+}
 
-use self::disassemble::Disassemble;
+pub mod disassembler;
+pub mod old_disassembler;
+
+use self::disassembler::Dis;
 use crate::bus::{Bus, Read, Region, Write};
 use owo_colors::OwoColorize;
 use rand::random;
@@ -138,7 +145,7 @@ pub struct CPU {
     timer: Instant,
     cycle: usize,
     breakpoints: Vec<Adr>,
-    disassembler: Disassemble,
+    disassembler: Dis,
 }
 
 // public interface
@@ -164,7 +171,7 @@ impl CPU {
         font: Adr,
         pc: Adr,
         sp: Adr,
-        disassembler: Disassemble,
+        disassembler: Dis,
         breakpoints: Vec<Adr>,
         flags: ControlFlags,
     ) -> Self {
@@ -549,7 +556,7 @@ impl CPU {
         self.pc = self.pc.wrapping_add(2);
         // decode opcode
 
-        use disassemble::{a, b, i, n, x, y};
+        use old_disassembler::{a, b, i, n, x, y};
         let (i, x, y, n, b, a) = (
             i(opcode),
             x(opcode),
@@ -674,7 +681,7 @@ impl CPU {
                 "{:3} {:03x}: {:<36}{:?}",
                 self.cycle.bright_black(),
                 pc,
-                self.disassembler.instruction(opcode),
+                self.disassembler.once(opcode),
                 elapsed.dimmed()
             );
         }
@@ -765,7 +772,7 @@ impl Default for CPU {
             },
             timer: Instant::now(),
             breakpoints: vec![],
-            disassembler: Disassemble::default(),
+            disassembler: Dis::default(),
         }
     }
 }

@@ -1,7 +1,7 @@
-use chirp::{error::Result, prelude::*};
+use chirp::{cpu::Disassembler, error::Result, prelude::*};
 use gumdrop::*;
-use std::{fs::read, path::PathBuf};
 use owo_colors::OwoColorize;
+use std::{fs::read, path::PathBuf};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Options, Hash)]
 struct Arguments {
@@ -22,18 +22,20 @@ fn parse_hex(value: &str) -> std::result::Result<u16, std::num::ParseIntError> {
 fn main() -> Result<()> {
     let options = Arguments::parse_args_default_or_exit();
     let contents = &read(&options.file)?;
-    let disassembler = Disassemble::default();
+    let disassembler = Dis::default();
     for (addr, insn) in contents[options.offset..].chunks_exact(2).enumerate() {
         let insn = u16::from_be_bytes(
             insn.try_into()
                 .expect("Iterated over 2-byte chunks, got <2 bytes"),
         );
         println!(
-            "{:03x}: {} {:04x}",
-            2 * addr + 0x200 + options.offset,
-            disassembler.instruction(insn),
-            insn.bright_black(),
-
+            "{}",
+            format_args!(
+                "{:03x}: {} {:04x}",
+                2 * addr + 0x200 + options.offset,
+                disassembler.once(insn),
+                insn.bright_black(),
+            )
         );
     }
     Ok(())

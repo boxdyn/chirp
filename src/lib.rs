@@ -19,7 +19,7 @@ pub mod prelude {
     use super::*;
     pub use crate::bus;
     pub use bus::{Bus, Read, Region::*, Write};
-    pub use cpu::{disassemble::Disassemble, ControlFlags, CPU};
+    pub use cpu::{disassembler::Dis, ControlFlags, CPU};
     pub use error::Result;
     pub use io::{UIBuilder, *};
 }

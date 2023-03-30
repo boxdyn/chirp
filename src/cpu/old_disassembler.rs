@@ -3,7 +3,7 @@
 
 //! A disassembler for Chip-8 opcodes
 
-use super::{Adr, Nib, Reg};
+use super::{Adr, Disassembler, Nib, Reg};
 use owo_colors::{OwoColorize, Style};
 type Ins = Nib;
 
@@ -40,22 +40,22 @@ pub fn a(ins: u16) -> Adr {
 
 /// Disassembles Chip-8 instructions, printing them in the provided [owo_colors::Style]s
 #[derive(Clone, Debug, PartialEq)]
-pub struct Disassemble {
+pub struct DeprecatedDisassembler {
     invalid: Style,
     normal: Style,
 }
 
-impl Default for Disassemble {
+impl Default for DeprecatedDisassembler {
     fn default() -> Self {
-        Disassemble::builder().build()
+        DeprecatedDisassembler::builder().build()
     }
 }
 
 // Public API
-impl Disassemble {
+impl DeprecatedDisassembler {
     /// Returns a new Disassemble with the provided Styles
-    pub fn new(invalid: Style, normal: Style) -> Disassemble {
-        Disassemble { invalid, normal }
+    pub fn new(invalid: Style, normal: Style) -> DeprecatedDisassembler {
+        DeprecatedDisassembler { invalid, normal }
     }
     /// Creates a [DisassembleBuilder], for partial configuration
     pub fn builder() -> DisassembleBuilder {
@@ -183,8 +183,14 @@ impl Disassemble {
     }
 }
 
+impl Disassembler for DeprecatedDisassembler {
+    fn once(&self, insn: u16) -> String {
+        self.instruction(insn)
+    }
+}
+
 // Private api
-impl Disassemble {
+impl DeprecatedDisassembler {
     /// Unused instructions
     fn unimplemented(&self, opcode: u16) -> String {
         format!("inval  {opcode:04x}")
@@ -400,8 +406,8 @@ impl DisassembleBuilder {
         self
     }
     /// Builds a Disassemble
-    pub fn build(self) -> Disassemble {
-        Disassemble {
+    pub fn build(self) -> DeprecatedDisassembler {
+        DeprecatedDisassembler {
             invalid: if let Some(style) = self.invalid {
                 style
             } else {
