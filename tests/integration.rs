@@ -189,6 +189,22 @@ mod cpu {
     }
 }
 
+mod dis {
+    use chirp::cpu::disassembler::Insn;
+    use imperative_rs::InstructionSet;
+
+    #[test]
+    fn clone() {
+        let opcode = Insn::decode(&[0xeF, 0xa1]).unwrap().1; // random valid opcode
+        let clone = opcode.clone();
+        assert_eq!(opcode, clone);
+    }
+    #[test]
+    fn debug() {
+        println!("{:?}", Insn::decode(b"AA")) // "sne #41, v1"
+    }
+}
+
 #[test]
 fn error() {
     let error = chirp::error::Error::MissingRegion { region: Screen };

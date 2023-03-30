@@ -6,7 +6,7 @@ use owo_colors::{OwoColorize, Style};
 use std::fmt::Display;
 
 #[allow(non_camel_case_types, non_snake_case, missing_docs)]
-#[derive(Clone, Copy, InstructionSet)]
+#[derive(Clone, Copy, Debug, InstructionSet, PartialEq, Eq)]
 /// Implements a Disassembler using imperative_rs
 pub enum Insn {
     /// | 00e0 | Clear screen memory to 0s
