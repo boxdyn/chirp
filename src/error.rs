@@ -6,20 +6,28 @@
 use crate::bus::Region;
 use thiserror::Error;
 
+/// Result type, equivalent to [std::result::Result]<T, [enum@Error]>
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Error type for Chirp.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Represents an unimplemented operation
     #[error("Unrecognized opcode {word}")]
     UnimplementedInstruction {
+        /// The offending word
         word: u16,
     },
+    /// The region you asked for was not defined
     #[error("No {region} found on bus")]
     MissingRegion {
+        /// The offending [Region]
         region: Region,
     },
+    /// Error originated in [std::io]
     #[error(transparent)]
     IoError(#[from] std::io::Error),
+    /// Error originated in [minifb]
     #[error(transparent)]
     MinifbError(#[from] minifb::Error),
 }

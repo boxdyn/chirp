@@ -61,14 +61,22 @@ impl Default for Quirks {
     }
 }
 
+/// Represents flags that aid in operation, but aren't inherent to the CPU
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ControlFlags {
+    /// Set when debug (live disassembly) mode enabled
     pub debug: bool,
+    /// Set when the emulator is paused by the user and should not update
     pub pause: bool,
+    /// Set when the emulator is waiting for a keypress
     pub keypause: bool,
+    /// Set when the emulator is waiting for a frame to be drawn
     pub vbi_wait: bool,
+    /// Set to the last key that's been *released* after a keypause
     pub lastkey: Option<usize>,
+    /// Represents the set of emulator "[Quirks]" to enable
     pub quirks: Quirks,
+    /// Represents the number of instructions to run per tick of the internal timer
     pub monotonic: Option<usize>,
 }
 
@@ -111,6 +119,8 @@ impl ControlFlags {
 /// Represents the internal state of the CPU interpreter
 #[derive(Clone, Debug, PartialEq)]
 pub struct CPU {
+    /// Flags that control how the CPU behaves, but which aren't inherent to the
+    /// implementation. Includes [Quirks], target IPF, etc.
     pub flags: ControlFlags,
     // memory map info
     screen: Adr,
@@ -468,6 +478,7 @@ impl CPU {
             return self;
         };
 
+        // Convert the elapsed time to 60ths of a second
         let time = self.timer.elapsed().as_secs_f64() * 60.0;
         self.timer = Instant::now();
         if time > 1.0 {

@@ -7,31 +7,38 @@ use super::{Adr, Nib, Reg};
 use owo_colors::{OwoColorize, Style};
 type Ins = Nib;
 
+/// Extracts the I nibble of an IXYN instruction
 #[inline]
 pub fn i(ins: u16) -> Ins {
     (ins >> 12 & 0xf) as Ins
 }
+/// Extracts the X nibble of an IXYN instruction
 #[inline]
 pub fn x(ins: u16) -> Reg {
     (ins >> 8 & 0xf) as Reg
 }
+/// Extracts the Y nibble of an IXYN instruction
 #[inline]
 pub fn y(ins: u16) -> Reg {
     (ins >> 4 & 0xf) as Reg
 }
+/// Extracts the N nibble of an IXYN instruction
 #[inline]
 pub fn n(ins: u16) -> Nib {
     (ins & 0xf) as Nib
 }
+/// Extracts the B byte of an IXBB instruction
 #[inline]
 pub fn b(ins: u16) -> u8 {
     (ins & 0xff) as u8
 }
+/// Extracts the ADR trinibble of an IADR instruction
 #[inline]
 pub fn a(ins: u16) -> Adr {
     ins & 0x0fff
 }
 
+/// Disassembles Chip-8 instructions, printing them in the provided [owo_colors::Style]s
 #[derive(Clone, Debug, PartialEq)]
 pub struct Disassemble {
     invalid: Style,
@@ -46,15 +53,15 @@ impl Default for Disassemble {
 
 // Public API
 impl Disassemble {
-    // Returns a new Disassemble with the provided Styles
+    /// Returns a new Disassemble with the provided Styles
     pub fn new(invalid: Style, normal: Style) -> Disassemble {
         Disassemble { invalid, normal }
     }
-    //
+    /// Creates a [DisassembleBuilder], for partial configuration
     pub fn builder() -> DisassembleBuilder {
         DisassembleBuilder::default()
     }
-    // Disassemble a single instruction
+    /// Disassemble a single instruction
     pub fn instruction(&self, opcode: u16) -> String {
         let (i, x, y, n, b, a) = (
             i(opcode),
@@ -374,6 +381,7 @@ impl Disassemble {
     }
 }
 
+/// Builder for [Disassemble]rs
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DisassembleBuilder {
     invalid: Option<Style>,

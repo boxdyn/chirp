@@ -59,6 +59,7 @@ pub enum Region {
     Screen,
     /// Stack space
     Stack,
+    #[doc(hidden)]
     /// Total number of named regions
     Count,
 }
@@ -293,7 +294,7 @@ impl Bus {
     ///#    Ok(())
     ///# }
     /// ```
-    /// If there is no Screen region, it will return Err(Error::MissingRegion)
+    /// If there is no Screen region, it will return Err([MissingRegion])
     /// ```rust,should_panic
     ///# use chirp::prelude::*;
     ///# fn main() -> Result<()> {
