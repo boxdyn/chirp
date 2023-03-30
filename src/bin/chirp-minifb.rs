@@ -91,7 +91,7 @@ impl State {
             ch8: Chip8 {
                 bus: bus! {
                     // Load the charset into ROM
-                    Charset [0x0050..0x00A0] = include_bytes!("mem/charset.bin"),
+                    Charset [0x0050..0x00A0] = include_bytes!("../mem/charset.bin"),
                     // Load the ROM file into RAM
                     Program [0x0200..0x1000] = &read(&options.file)?,
                     // Create a screen
