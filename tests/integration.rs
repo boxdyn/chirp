@@ -236,7 +236,7 @@ mod ui {
         let mut ch8 = new_chip8();
         let ch8 = &mut ch8;
         ui.frame(ch8).unwrap();
-        ui.keys(ch8);
+        ui.keys(ch8).unwrap();
         Ok(())
     }
     #[test]

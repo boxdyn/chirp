@@ -6,7 +6,7 @@ use owo_colors::{OwoColorize, Style};
 use std::fmt::Display;
 
 #[allow(non_camel_case_types, non_snake_case, missing_docs)]
-#[derive(Clone, Copy, InstructionSet, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, InstructionSet)]
 /// Implements a Disassembler using imperative_rs
 pub enum Insn {
     /// | 00e0 | Clear screen memory to 0s
@@ -68,10 +68,10 @@ pub enum Insn {
     sne { y: usize, x: usize },
     /// | Aaaa | Load address #a into register I
     #[opcode = "0xaAAA"]
-    movI { A: usize },
+    movI { A: u16 },
     /// | Baaa | Jump to &adr + v0
     #[opcode = "0xbAAA"]
-    jmpr { A: usize },
+    jmpr { A: u16 },
     /// | Cxbb | Stores a random number & the provided byte into vX
     #[opcode = "0xcxBB"]
     rand { B: u8, x: usize },

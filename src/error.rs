@@ -3,6 +3,8 @@
 
 //! Error type for Chirp
 
+use std::ops::Range;
+
 use crate::bus::Region;
 use thiserror::Error;
 
@@ -24,9 +26,18 @@ pub enum Error {
         /// The offending [Region]
         region: Region,
     },
+    /// Tried to fetch [Range] from bus, received nothing
+    #[error("Invalid range {range:?} for bus")]
+    InvalidBusRange {
+        /// The offending [Range]
+        range: Range<usize>,
+    },
     /// Error originated in [std::io]
     #[error(transparent)]
     IoError(#[from] std::io::Error),
+    /// Error originated in [std::array::TryFromSliceError]
+    #[error(transparent)]
+    TryFromSliceError(#[from] std::array::TryFromSliceError),
     /// Error originated in [minifb]
     #[error(transparent)]
     MinifbError(#[from] minifb::Error),

@@ -127,27 +127,36 @@ impl State {
         state.ch8.bus.write(0x1feu16, options.data);
         Ok(state)
     }
-    fn keys(&mut self) -> Option<()> {
+    fn keys(&mut self) -> Result<Option<()>> {
         self.ui.keys(&mut self.ch8)
     }
     fn frame(&mut self) -> Option<()> {
         self.ui.frame(&mut self.ch8)
     }
-    fn tick_cpu(&mut self) {
+    fn tick_cpu(&mut self) -> Result<()> {
         if !self.ch8.cpu.flags.pause {
             let rate = self.speed;
             match self.step {
                 Some(ticks) => {
-                    self.ch8.cpu.multistep(&mut self.ch8.bus, ticks);
+                    let time = Instant::now();
+                    self.ch8.cpu.multistep(&mut self.ch8.bus, ticks)?;
+                    let time = time.elapsed();
+                    let nspt = time.as_secs_f64() / ticks as f64;
+                    eprintln!(
+                        "{ticks},\t{time:.05?},\t{:.4}nspt,\t{}ipf",
+                        nspt * 1_000_000_000.0,
+                        ((1.0 / 60.0f64) / nspt).trunc(),
+                    );
                     // Pause the CPU and clear step
-                    self.ch8.cpu.flags.pause = true;
-                    self.step = None;
+                    //self.ch8.cpu.flags.pause = true;
+                    //self.step = None;
                 }
                 None => {
-                    self.ch8.cpu.multistep(&mut self.ch8.bus, rate);
+                    self.ch8.cpu.multistep(&mut self.ch8.bus, rate)?;
                 }
             }
         }
+        Ok(())
     }
     fn wait_for_next_frame(&mut self) {
         let rate = 1_000_000_000 / self.rate + 1;
@@ -161,8 +170,8 @@ impl Iterator for State {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.wait_for_next_frame();
-        self.keys()?;
-        self.tick_cpu();
+        self.keys().unwrap_or_else(|_| None)?;
+        self.tick_cpu().ok()?;
         self.frame();
         Some(())
     }

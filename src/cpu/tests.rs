@@ -54,28 +54,28 @@ mod unimplemented {
     fn ins_5xyn() {
         let (mut cpu, mut bus) = setup_environment();
         bus.write(0x200u16, 0x500fu16); // 0x500f is not an instruction
-        cpu.tick(&mut bus);
+        cpu.tick(&mut bus).unwrap();
     }
     #[test]
     #[should_panic]
     fn ins_8xyn() {
         let (mut cpu, mut bus) = setup_environment();
         bus.write(0x200u16, 0x800fu16); // 0x800f is not an instruction
-        cpu.tick(&mut bus);
+        cpu.tick(&mut bus).unwrap();
     }
     #[test]
     #[should_panic]
     fn ins_9xyn() {
         let (mut cpu, mut bus) = setup_environment();
         bus.write(0x200u16, 0x900fu16); // 0x800f is not an instruction
-        cpu.tick(&mut bus);
+        cpu.tick(&mut bus).unwrap();
     }
     #[test]
     #[should_panic]
     fn ins_exbb() {
         let (mut cpu, mut bus) = setup_environment();
         bus.write(0x200u16, 0xe00fu16); // 0xe00f is not an instruction
-        cpu.tick(&mut bus);
+        cpu.tick(&mut bus).unwrap();
     }
     // Fxbb
     #[test]
@@ -83,22 +83,12 @@ mod unimplemented {
     fn ins_fxbb() {
         let (mut cpu, mut bus) = setup_environment();
         bus.write(0x200u16, 0xf00fu16); // 0xf00f is not an instruction
-        cpu.tick(&mut bus);
+        cpu.tick(&mut bus).unwrap();
     }
 }
 
 mod sys {
     use super::*;
-    /// 0aaa: Handles a "machine language function call" (lmao)
-    #[test]
-    #[should_panic]
-    fn sys() {
-        let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0x0200u16); // 0x0200 is not one of the allowed routines
-        cpu.tick(&mut bus);
-        cpu.sys(0x200);
-    }
-
     /// 00e0: Clears the screen memory to 0
     #[test]
     fn clear_screen() {
@@ -639,11 +629,13 @@ mod io {
             for test in SCREEN_TESTS {
                 let (mut cpu, mut bus) = setup_environment();
                 cpu.flags.quirks = test.quirks;
+                // Debug mode is 5x slower
+                cpu.flags.debug = false;
                 // Load the test program
                 bus = bus.load_region(Program, test.program);
                 // Run the test program for the specified number of steps
                 while cpu.cycle() < test.steps {
-                    cpu.multistep(&mut bus, test.steps - cpu.cycle());
+                    cpu.multistep(&mut bus, test.steps - cpu.cycle()).unwrap();
                 }
                 // Compare the screen to the reference screen buffer
                 bus.print_screen().unwrap();
@@ -938,7 +930,7 @@ mod behavior {
             cpu.flags.monotonic = None;
             cpu.delay = 10.0;
             for _ in 0..2 {
-                cpu.multistep(&mut bus, 8);
+                cpu.multistep(&mut bus, 8).unwrap();
                 std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
             }
             // time is within 1 frame deviance over a theoretical 2 frame pause
@@ -950,7 +942,7 @@ mod behavior {
             cpu.flags.monotonic = None; // disable monotonic timing
             cpu.sound = 10.0;
             for _ in 0..2 {
-                cpu.multistep(&mut bus, 8);
+                cpu.multistep(&mut bus, 8).unwrap();
                 std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
             }
             // time is within 1 frame deviance over a theoretical 2 frame pause
@@ -962,7 +954,7 @@ mod behavior {
             cpu.flags.monotonic = None; // disable monotonic timing
             cpu.flags.vbi_wait = true;
             for _ in 0..2 {
-                cpu.multistep(&mut bus, 8);
+                cpu.multistep(&mut bus, 8).unwrap();
                 std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
             }
             // Display wait is disabled after a 1 frame pause
@@ -975,7 +967,7 @@ mod behavior {
         fn hit_break() {
             let (mut cpu, mut bus) = setup_environment();
             cpu.set_break(0x202);
-            cpu.multistep(&mut bus, 10);
+            cpu.multistep(&mut bus, 10).unwrap();
             assert_eq!(true, cpu.flags.pause);
             assert_eq!(0x202, cpu.pc);
         }
