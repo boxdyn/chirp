@@ -182,6 +182,7 @@ version = "0.1.0"
 dependencies = [
  "gumdrop",
  "iced",
+ "imperative-rs",
  "minifb",
  "owo-colors",
  "rand",
@@ -1085,6 +1086,27 @@ name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
+
+[[package]]
+name = "imperative-rs"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fed4f0a3a8fe169e919b74f6ba77c473d356ef05d0d65da06467b8836e508aa3"
+dependencies = [
+ "imperative-rs-derive",
+]
+
+[[package]]
+name = "imperative-rs-derive"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02b842fd8a24b2b715ac0baffae4aa72aa59ecb8e90d3de175180dbb5b1caaab"
+dependencies = [
+ "lazy_static",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "indexmap"

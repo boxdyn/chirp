@@ -14,7 +14,7 @@ fn run_single_op(op: &[u8]) -> CPU {
     );
     cpu.v = *INDX;
     cpu.flags.quirks = Quirks::from(true);
-    cpu.tick(&mut bus); // will panic if unimplemented
+    cpu.tick(&mut bus).unwrap(); // will panic if unimplemented
     cpu
 }
 

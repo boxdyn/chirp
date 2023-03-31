@@ -7,6 +7,7 @@
 use std::{
     ffi::OsStr,
     path::{Path, PathBuf},
+    time::Instant,
 };
 
 use crate::{
@@ -48,6 +49,7 @@ impl UIBuilder {
             keyboard: Default::default(),
             fb: Default::default(),
             rom: self.rom.to_owned().unwrap_or_default(),
+            time: Instant::now(),
         };
         Ok(ui)
     }
@@ -108,7 +110,7 @@ impl FrameBuffer {
         if let Some(screen) = bus.get_region(Region::Screen) {
             for (idx, byte) in screen.iter().enumerate() {
                 for bit in 0..8 {
-                    self.buffer[8 * idx + bit] = if byte & (1 << 7 - bit) as u8 != 0 {
+                    self.buffer[8 * idx + bit] = if byte & (1 << (7 - bit)) as u8 != 0 {
                         self.format.fg
                     } else {
                         self.format.bg
@@ -135,6 +137,7 @@ pub struct UI {
     keyboard: Vec<Key>,
     fb: FrameBuffer,
     rom: PathBuf,
+    time: Instant,
 }
 
 impl UI {
@@ -143,15 +146,22 @@ impl UI {
             if ch8.cpu.flags.pause {
                 self.window.set_title("Chirp  ⏸")
             } else {
-                self.window.set_title("Chirp  ▶");
+                self.window.set_title(&format!(
+                    "Chirp  ▶ {:2?}",
+                    (1.0 / self.time.elapsed().as_secs_f64()).trunc()
+                ));
             }
+            if !self.window.is_open() {
+                std::process::exit(0);
+            }
+            self.time = Instant::now();
             // update framebuffer
-            self.fb.render(&mut self.window, &mut ch8.bus);
+            self.fb.render(&mut self.window, &ch8.bus);
         }
         Some(())
     }
 
-    pub fn keys(&mut self, ch8: &mut Chip8) -> Option<()> {
+    pub fn keys(&mut self, ch8: &mut Chip8) -> Result<Option<()>> {
         // TODO: Remove this hacky workaround for minifb's broken get_keys_* functions.
         let get_keys_pressed = || {
             self.window
@@ -179,7 +189,7 @@ impl UI {
                     .print_screen()
                     .expect("The 'screen' memory region should exist"),
                 F3 => {
-                    debug_dump_screen(&ch8, &self.rom).expect("Unable to write debug screen dump");
+                    debug_dump_screen(ch8, &self.rom).expect("Unable to write debug screen dump");
                 }
                 F4 | Slash => {
                     eprintln!("Debug {}.", {
@@ -201,7 +211,7 @@ impl UI {
                 }),
                 F6 | Enter => {
                     eprintln!("Step");
-                    ch8.cpu.singlestep(&mut ch8.bus);
+                    ch8.cpu.singlestep(&mut ch8.bus)?;
                 }
                 F7 => {
                     eprintln!("Set breakpoint {:03x}.", ch8.cpu.pc());
@@ -216,12 +226,12 @@ impl UI {
                     ch8.cpu.soft_reset();
                     ch8.bus.clear_region(Screen);
                 }
-                Escape => return None,
+                Escape => return Ok(None),
                 key => ch8.cpu.press(identify_key(key)),
             }
         }
         self.keyboard = self.window.get_keys();
-        Some(())
+        Ok(Some(()))
     }
 }
 

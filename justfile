@@ -4,7 +4,7 @@ test:
     cargo test --doc && cargo nextest run
 
 chirp:
-    cargo run --bin chirp -- tests/chip8-test-suite/bin/chip8-test-suite.ch8
+    cargo run --bin chirp-minifb -- tests/chip8-test-suite/bin/chip8-test-suite.ch8
 
 cover:
     cargo llvm-cov --open --doctests

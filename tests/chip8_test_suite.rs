@@ -33,7 +33,7 @@ fn run_screentest(test: SuiteTest, mut cpu: CPU, mut bus: Bus) {
     bus = bus.load_region(Program, test.program);
     // The test suite always initiates a keypause on test completion
     while !cpu.flags.keypause {
-        cpu.multistep(&mut bus, 8);
+        cpu.multistep(&mut bus, 8).unwrap();
     }
     // Compare the screen to the reference screen buffer
     bus.print_screen().unwrap();

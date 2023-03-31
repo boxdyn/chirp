@@ -22,6 +22,7 @@ mod bus {
             assert_eq!(r1, r2);
         }
         #[test]
+        #[allow(clippy::clone_on_copy)]
         fn clone() {
             let r1 = Screen;
             let r2 = r1.clone();
@@ -189,6 +190,23 @@ mod cpu {
     }
 }
 
+mod dis {
+    use chirp::cpu::disassembler::Insn;
+    use imperative_rs::InstructionSet;
+
+    #[test]
+    #[allow(clippy::clone_on_copy)]
+    fn clone() {
+        let opcode = Insn::decode(&[0xef, 0xa1]).unwrap().1; // random valid opcode
+        let clone = opcode.clone();
+        assert_eq!(opcode, clone);
+    }
+    #[test]
+    fn debug() {
+        println!("{:?}", Insn::decode(b"AA")) // "sne #41, v1"
+    }
+}
+
 #[test]
 fn error() {
     let error = chirp::error::Error::MissingRegion { region: Screen };
@@ -210,6 +228,7 @@ mod ui_builder {
         println!("{ui_builder:?}");
     }
     #[test]
+    #[allow(clippy::redundant_clone)]
     fn clone_debug() {
         let ui_builder_clone = UIBuilder::default().clone();
         println!("{ui_builder_clone:?}");
@@ -236,7 +255,7 @@ mod ui {
         let mut ch8 = new_chip8();
         let ch8 = &mut ch8;
         ui.frame(ch8).unwrap();
-        ui.keys(ch8);
+        ui.keys(ch8).unwrap();
         Ok(())
     }
     #[test]
