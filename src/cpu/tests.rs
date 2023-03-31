@@ -109,7 +109,7 @@ mod sys {
         // Place the address on the stack
         bus.write(cpu.sp.wrapping_add(2), test_addr);
 
-        cpu.ret(&mut bus);
+        cpu.ret(&bus);
 
         // Verify the current address is the address from the stack
         assert_eq!(test_addr, cpu.pc);
@@ -715,20 +715,20 @@ mod io {
                 for x in 0..0xf {
                     cpu.v[x] = 0xff;
                     cpu.wait_for_key(x);
-                    assert_eq!(true, cpu.flags.keypause);
+                    assert!(cpu.flags.keypause);
                     assert_eq!(0xff, cpu.v[x]);
                     // There are three parts to a button press
                     // When the button is pressed
                     cpu.press(key);
-                    assert_eq!(true, cpu.flags.keypause);
+                    assert!(cpu.flags.keypause);
                     assert_eq!(0xff, cpu.v[x]);
                     // When the button is held
                     cpu.wait_for_key(x);
-                    assert_eq!(true, cpu.flags.keypause);
+                    assert!(cpu.flags.keypause);
                     assert_eq!(0xff, cpu.v[x]);
                     // And when the button is released!
                     cpu.release(key);
-                    assert_eq!(false, cpu.flags.keypause);
+                    assert!(!cpu.flags.keypause);
                     assert_eq!(Some(key), cpu.flags.lastkey);
                     cpu.wait_for_key(x);
                     assert_eq!(key as u8, cpu.v[x]);
@@ -880,7 +880,7 @@ mod io {
         const DATA: &[u8] = b"ABCDEFGHIJKLMNOP";
         // Load some test data into memory
         let addr = 0x456;
-        cpu.v.as_mut_slice().write(DATA).unwrap();
+        cpu.v.as_mut_slice().write_all(DATA).unwrap();
         for len in 0..16 {
             // Perform DMA store
             cpu.i = addr as u16;
@@ -890,7 +890,7 @@ mod io {
             assert_eq!(bus[0..=len], DATA[0..=len]);
             assert_eq!(bus[len + 1..], [0; 16][len + 1..]);
             // clear
-            bus.write(&[0; 16]).unwrap();
+            bus.write_all(&[0; 16]).unwrap();
         }
     }
 
@@ -904,7 +904,7 @@ mod io {
         let addr = 0x456;
         bus.get_mut(addr..addr + DATA.len())
             .unwrap()
-            .write(DATA)
+            .write_all(DATA)
             .unwrap();
         for len in 0..16 {
             // Perform DMA load
@@ -958,7 +958,7 @@ mod behavior {
                 std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
             }
             // Display wait is disabled after a 1 frame pause
-            assert_eq!(false, cpu.flags.vbi_wait);
+            assert!(!cpu.flags.vbi_wait);
         }
     }
     mod breakpoint {
@@ -968,7 +968,7 @@ mod behavior {
             let (mut cpu, mut bus) = setup_environment();
             cpu.set_break(0x202);
             cpu.multistep(&mut bus, 10).unwrap();
-            assert_eq!(true, cpu.flags.pause);
+            assert!(cpu.flags.pause);
             assert_eq!(0x202, cpu.pc);
         }
     }

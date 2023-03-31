@@ -394,7 +394,7 @@ impl CPU {
     /// Unset a breakpoint
     // TODO: Unit test this
     pub fn unset_break(&mut self, point: Adr) -> &mut Self {
-        fn linear_find(needle: Adr, haystack: &Vec<Adr>) -> Option<usize> {
+        fn linear_find(needle: Adr, haystack: &[Adr]) -> Option<usize> {
             for (i, v) in haystack.iter().enumerate() {
                 if *v == needle {
                     return Some(i);
@@ -402,7 +402,7 @@ impl CPU {
             }
             None
         }
-        if let Some(idx) = linear_find(point, &self.breakpoints) {
+        if let Some(idx) = linear_find(point, self.breakpoints.as_slice()) {
             assert_eq!(point, self.breakpoints.swap_remove(idx));
         }
         self
@@ -419,7 +419,7 @@ impl CPU {
     ///# }
     /// ```
     pub fn breakpoints(&self) -> &[Adr] {
-        &self.breakpoints.as_slice()
+        self.breakpoints.as_slice()
     }
 
     /// Unpauses the emulator for a single tick,
@@ -498,7 +498,7 @@ impl CPU {
         // Use a monotonic counter when testing
         if let Some(speed) = self.flags.monotonic {
             if self.flags.vbi_wait {
-                self.flags.vbi_wait = !(self.cycle % speed == 0);
+                self.flags.vbi_wait = self.cycle % speed != 0;
             }
             let speed = 1.0 / speed as f64;
             self.delay -= speed;
@@ -1003,7 +1003,7 @@ impl CPU {
             let addr = (y + byte) * 8 + (x & 0x3f) / 8 + self.screen;
             // Read a byte of sprite data into a u16, and shift it x % 8 bits
             let sprite: u8 = bus.read(self.i + byte);
-            let sprite = (sprite as u16) << 8 - (x & 7) & if x % 64 > 56 { 0xff00 } else { 0xffff };
+            let sprite = (sprite as u16) << (8 - (x & 7)) & if x % 64 > 56 { 0xff00 } else { 0xffff };
             // Read a u16 from the bus containing the two bytes which might need to be updated
             let mut screen: u16 = bus.read(addr);
             // Save the bits-toggled-off flag if necessary
@@ -1145,7 +1145,7 @@ impl CPU {
     fn load_dma(&mut self, x: Reg, bus: &mut Bus) {
         let i = self.i as usize;
         for (reg, value) in bus
-            .get(i + 0..=i + x)
+            .get(i..=i + x)
             .unwrap_or_default()
             .iter()
             .enumerate()

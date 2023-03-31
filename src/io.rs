@@ -110,7 +110,7 @@ impl FrameBuffer {
         if let Some(screen) = bus.get_region(Region::Screen) {
             for (idx, byte) in screen.iter().enumerate() {
                 for bit in 0..8 {
-                    self.buffer[8 * idx + bit] = if byte & (1 << 7 - bit) as u8 != 0 {
+                    self.buffer[8 * idx + bit] = if byte & (1 << (7 - bit)) as u8 != 0 {
                         self.format.fg
                     } else {
                         self.format.bg
@@ -156,7 +156,7 @@ impl UI {
             }
             self.time = Instant::now();
             // update framebuffer
-            self.fb.render(&mut self.window, &mut ch8.bus);
+            self.fb.render(&mut self.window, &ch8.bus);
         }
         Some(())
     }
@@ -189,7 +189,7 @@ impl UI {
                     .print_screen()
                     .expect("The 'screen' memory region should exist"),
                 F3 => {
-                    debug_dump_screen(&ch8, &self.rom).expect("Unable to write debug screen dump");
+                    debug_dump_screen(ch8, &self.rom).expect("Unable to write debug screen dump");
                 }
                 F4 | Slash => {
                     eprintln!("Debug {}.", {

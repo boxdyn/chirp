@@ -190,12 +190,13 @@ impl Iterator for State {
 fn main() -> Result<()> {
     let options = Arguments::parse_args_default_or_exit();
     let state = State::new(options)?;
-    Ok(for result in state {
+    for result in state {
         if let Err(e) = result {
             eprintln!("{}", e.bold().red());
             break;
         }
-    })
+    }
+    Ok(())
 }
 
 /// Parses a hexadecimal string into a u16

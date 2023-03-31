@@ -1,5 +1,5 @@
 //! A disassembler for Chip-8 opcodes
-
+#![allow(clippy::bad_bit_mask)]
 use super::Disassembler;
 use imperative_rs::InstructionSet;
 use owo_colors::{OwoColorize, Style};
@@ -175,7 +175,7 @@ impl Default for Dis {
 
 impl Disassembler for Dis {
     fn once(&self, insn: u16) -> String {
-        if let Some((_, insn)) = Insn::decode(&insn.to_be_bytes()).ok() {
+        if let Ok((_, insn)) = Insn::decode(&insn.to_be_bytes()) {
             format!("{}", insn.style(self.normal))
         } else {
             format!("{}", format_args!("inval  {insn:04x}").style(self.invalid))

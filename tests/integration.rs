@@ -22,6 +22,7 @@ mod bus {
             assert_eq!(r1, r2);
         }
         #[test]
+        #[allow(clippy::clone_on_copy)]
         fn clone() {
             let r1 = Screen;
             let r2 = r1.clone();
@@ -194,8 +195,9 @@ mod dis {
     use imperative_rs::InstructionSet;
 
     #[test]
+    #[allow(clippy::clone_on_copy)]
     fn clone() {
-        let opcode = Insn::decode(&[0xeF, 0xa1]).unwrap().1; // random valid opcode
+        let opcode = Insn::decode(&[0xef, 0xa1]).unwrap().1; // random valid opcode
         let clone = opcode.clone();
         assert_eq!(opcode, clone);
     }
@@ -226,6 +228,7 @@ mod ui_builder {
         println!("{ui_builder:?}");
     }
     #[test]
+    #[allow(clippy::redundant_clone)]
     fn clone_debug() {
         let ui_builder_clone = UIBuilder::default().clone();
         println!("{ui_builder_clone:?}");
