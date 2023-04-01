@@ -1,7 +1,13 @@
+
+# Rust files
 /target
+Cargo.lock
+
 # Chip-8 test ROMs
 /chip-8
 
 # VS Code files
 /.vscode
+
+# Project's files
 screen_dump.bin
