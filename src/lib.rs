@@ -12,15 +12,10 @@ pub mod bus;
 pub mod cpu;
 pub mod error;
 
-/// Common imports for Chirp
-pub mod prelude {
-    pub use super::Chip8;
-    use super::*;
-    pub use crate::bus;
-    pub use bus::{Bus, Read, Region::*, Write};
-    pub use cpu::{disassembler::Dis, ControlFlags, CPU};
-    pub use error::Result;
-}
+// Common imports for Chirp
+pub use bus::{Bus, Read, Region::*, Write};
+pub use cpu::{disassembler::Dis, ControlFlags, CPU};
+pub use error::Result;
 
 /// Holds the state of a Chip-8
 #[derive(Clone, Debug, Default, PartialEq)]

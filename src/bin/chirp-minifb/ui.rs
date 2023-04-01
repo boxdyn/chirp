@@ -104,7 +104,7 @@ impl FrameBuffer {
             format: Default::default(),
         }
     }
-    pub fn render(&mut self, window: &mut Window, bus: &Bus) {
+    pub fn render(&mut self, window: &mut Window, bus: &Bus) -> Result<()> {
         if let Some(screen) = bus.get_region(Region::Screen) {
             for (idx, byte) in screen.iter().enumerate() {
                 for bit in 0..8 {
@@ -116,10 +116,8 @@ impl FrameBuffer {
                 }
             }
         }
-        //TODO: NOT THIS
-        window
-            .update_with_buffer(&self.buffer, self.width, self.height)
-            .expect("The window manager should update the buffer.");
+        window.update_with_buffer(&self.buffer, self.width, self.height)?;
+        Ok(())
     }
 }
 
@@ -139,27 +137,25 @@ pub struct UI {
 }
 
 impl UI {
-    pub fn frame(&mut self, ch8: &mut Chip8) -> Option<()> {
-        {
-            if ch8.cpu.flags.pause {
-                self.window.set_title("Chirp  ⏸")
-            } else {
-                self.window.set_title(&format!(
-                    "Chirp  ▶ {:02.02}",
-                    (1.0 / self.time.elapsed().as_secs_f64())
-                ));
-            }
-            if !self.window.is_open() {
-                std::process::exit(0);
-            }
-            self.time = Instant::now();
-            // update framebuffer
-            self.fb.render(&mut self.window, &ch8.bus);
+    pub fn frame(&mut self, ch8: &mut Chip8) -> Result<bool> {
+        if ch8.cpu.flags.pause {
+            self.window.set_title("Chirp ⏸")
+        } else {
+            self.window.set_title(&format!(
+                "Chirp  ▶ {:02.02}",
+                (1.0 / self.time.elapsed().as_secs_f64())
+            ));
         }
-        Some(())
+        if !self.window.is_open() {
+            return Ok(false);
+        }
+        self.time = Instant::now();
+        // update framebuffer
+        self.fb.render(&mut self.window, &ch8.bus)?;
+        Ok(true)
     }
 
-    pub fn keys(&mut self, ch8: &mut Chip8) -> Result<Option<()>> {
+    pub fn keys(&mut self, ch8: &mut Chip8) -> Result<bool> {
         // TODO: Remove this hacky workaround for minifb's broken get_keys_* functions.
         let get_keys_pressed = || {
             self.window
@@ -173,7 +169,7 @@ impl UI {
                 .into_iter()
                 .filter(|key| !self.window.get_keys().contains(key))
         };
-        use crate::io::Region::*;
+        use crate::ui::Region::*;
         for key in get_keys_released() {
             if let Some(key) = identify_key(key) {
                 ch8.cpu.release(key)?;
@@ -184,10 +180,7 @@ impl UI {
             use Key::*;
             match key {
                 F1 | Comma => ch8.cpu.dump(),
-                F2 | Period => ch8
-                    .bus
-                    .print_screen()
-                    .expect("The 'screen' memory region should exist"),
+                F2 | Period => ch8.bus.print_screen()?,
                 F3 => {
                     debug_dump_screen(ch8, &self.rom).expect("Unable to write debug screen dump");
                 }
@@ -226,7 +219,7 @@ impl UI {
                     ch8.cpu.soft_reset();
                     ch8.bus.clear_region(Screen);
                 }
-                Escape => return Ok(None),
+                Escape => return Ok(false),
                 key => {
                     if let Some(key) = identify_key(key) {
                         ch8.cpu.press(key)?;
@@ -235,7 +228,7 @@ impl UI {
             }
         }
         self.keyboard = self.window.get_keys();
-        Ok(Some(()))
+        Ok(true)
     }
 }
 

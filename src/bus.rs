@@ -15,7 +15,7 @@ use std::{
 /// Creates a new bus, growing the backing memory as needed
 /// # Examples
 /// ```rust
-/// # use chirp::prelude::*;
+/// # use chirp::*;
 /// let mut bus = bus! {
 ///     Stack   [0x0000..0x0800] = b"ABCDEF",
 ///     Program [0x0800..0x1000] = include_bytes!("bus.rs"),
@@ -92,7 +92,7 @@ impl Bus {
     /// Constructs a new bus
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new();
     ///     assert!(bus.is_empty());
@@ -106,7 +106,7 @@ impl Bus {
     /// Gets the length of the bus' backing memory
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
     ///         .add_region(Program, 0..1234);
@@ -121,7 +121,7 @@ impl Bus {
     /// Returns true if the backing memory contains no elements
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new();
     ///     assert!(bus.is_empty());
@@ -134,7 +134,7 @@ impl Bus {
     /// Grows the Bus backing memory to at least size bytes, but does not truncate
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let mut bus = Bus::new();
     ///     bus.with_size(1234);
@@ -152,7 +152,7 @@ impl Bus {
     /// Adds a new named range (Region) to the bus
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new().add_region(Program, 0..1234);
     ///     assert_eq!(1234, bus.len());
@@ -169,7 +169,7 @@ impl Bus {
     /// Loads data into a named region
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
     ///         .add_region(Program, 0..1234)
@@ -188,7 +188,7 @@ impl Bus {
     /// Fills a named region with zeroes
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
     ///         .add_region(Program, 0..1234)
@@ -199,7 +199,7 @@ impl Bus {
     /// ```
     /// If the region doesn't exist, that's okay.
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
     ///         .add_region(Program, 0..1234)
@@ -218,7 +218,7 @@ impl Bus {
     /// Gets a slice of bus memory
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
     ///         .add_region(Program, 0..10);
@@ -236,7 +236,7 @@ impl Bus {
     /// Gets a mutable slice of bus memory
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let mut bus = Bus::new()
     ///         .add_region(Program, 0..10);
@@ -254,7 +254,7 @@ impl Bus {
     /// Gets a slice of a named region of memory
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
     ///         .add_region(Program, 0..10);
@@ -269,7 +269,7 @@ impl Bus {
     /// Gets a mutable slice of a named region of memory
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let mut bus = Bus::new()
     ///         .add_region(Program, 0..10);
@@ -286,7 +286,7 @@ impl Bus {
     ///
     /// [Bus::print_screen] will print the screen
     /// ```rust
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
     ///         .add_region(Screen, 0x000..0x100);
@@ -296,7 +296,7 @@ impl Bus {
     /// ```
     /// If there is no Screen region, it will return Err([MissingRegion])
     /// ```rust,should_panic
-    ///# use chirp::prelude::*;
+    ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let mut bus = Bus::new()
     ///         .add_region(Program, 0..10);

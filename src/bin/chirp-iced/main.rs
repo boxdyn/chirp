@@ -1,5 +1,5 @@
 #![allow(unused_imports)]
-use chirp::prelude::*;
+use chirp::*;
 #[cfg(features = "iced")]
 use iced::{
     executor, time, window, Alignment, Application, Command, Element, Length, Settings,

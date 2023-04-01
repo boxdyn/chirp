@@ -1,4 +1,4 @@
-use chirp::{error::Result, prelude::*};
+use chirp::{error::Result, *};
 use std::{env::args, fs::read};
 
 fn main() -> Result<()> {

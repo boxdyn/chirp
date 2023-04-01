@@ -4,19 +4,20 @@
 //! Chirp: A chip-8 interpreter in Rust
 //! Hello, world!
 
-mod io;
 #[cfg(test)]
 mod tests;
+mod ui;
 
-use chirp::{error::Result, prelude::*};
+use chirp::error::Error::BreakpointHit;
+use chirp::{error::Result, *};
 use gumdrop::*;
-use io::*;
 use owo_colors::OwoColorize;
 use std::fs::read;
 use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
+use ui::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Options, Hash)]
 struct Arguments {
@@ -136,10 +137,10 @@ impl State {
         state.ch8.bus.write(0x1feu16, options.data);
         Ok(state)
     }
-    fn keys(&mut self) -> Result<Option<()>> {
+    fn keys(&mut self) -> Result<bool> {
         self.ui.keys(&mut self.ch8)
     }
-    fn frame(&mut self) -> Option<()> {
+    fn frame(&mut self) -> Result<bool> {
         self.ui.frame(&mut self.ch8)
     }
     fn tick_cpu(&mut self) -> Result<()> {
@@ -180,14 +181,23 @@ impl Iterator for State {
     fn next(&mut self) -> Option<Self::Item> {
         self.wait_for_next_frame();
         match self.keys() {
-            Ok(opt) => opt?,
-            Err(e) => return Some(Err(e)), // summary
+            Ok(opt) if !opt => return None,
+            Err(e) => return Some(Err(e)), // summary lol
+            _ => (),
         }
-        self.keys().unwrap_or(None)?;
-        if let Err(e) = self.tick_cpu() {
-            return Some(Err(e));
+        // Allow breakpoint hit messages
+        match self.tick_cpu() {
+            Err(BreakpointHit { addr, next }) => {
+                eprintln!("Breakpoint hit: {:3x} ({:4x})", addr, next);
+            }
+            Err(e) => return Some(Err(e)),
+            _ => (),
         }
-        self.frame()?;
+        match self.frame() {
+            Ok(opt) if !opt => return None,
+            Err(e) => return Some(Err(e)),
+            _ => (),
+        }
         Some(Ok(()))
     }
 }

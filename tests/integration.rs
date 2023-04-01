@@ -1,5 +1,5 @@
 //! Testing methods on Chirp's public API
-use chirp::prelude::*;
+use chirp::*;
 use std::{collections::hash_map::DefaultHasher, hash::Hash};
 
 #[test]

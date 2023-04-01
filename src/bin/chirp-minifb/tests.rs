@@ -1,7 +1,7 @@
 //! Tests for chirp-minifb
 
-use super::io::*;
-use chirp::prelude::*;
+use super::ui::*;
+use chirp::*;
 use std::{collections::hash_map::DefaultHasher, hash::Hash};
 
 mod ui_builder {

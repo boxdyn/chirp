@@ -1,4 +1,4 @@
-use chirp::{cpu::Disassembler, error::Result, prelude::*};
+use chirp::{cpu::Disassembler, error::Result, *};
 use gumdrop::*;
 use owo_colors::OwoColorize;
 use std::{fs::read, path::PathBuf};

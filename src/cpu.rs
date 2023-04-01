@@ -95,7 +95,7 @@ impl ControlFlags {
     ///
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// assert_eq!(true, cpu.flags.debug);
     /// // Toggle debug mode
@@ -110,7 +110,7 @@ impl ControlFlags {
     ///
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// assert_eq!(false, cpu.flags.pause);
     /// // Pause the cpu
@@ -169,7 +169,7 @@ impl CPU {
     /// Constructs a new CPU, taking all configurable parameters
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let cpu = CPU::new(
     ///     0xf00,  // screen location
     ///     0x50,   // font location
@@ -207,7 +207,7 @@ impl CPU {
     ///
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     ///
     /// // press key `7`
@@ -238,7 +238,7 @@ impl CPU {
     /// and the [ControlFlags::lastkey] is recorded.
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// // press key `7`
     /// cpu.press(0x7).unwrap();
@@ -269,7 +269,7 @@ impl CPU {
     /// If the register doesn't exist, returns [Error::InvalidRegister]
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// // Create a new CPU, and set v4 to 0x41
     /// let mut cpu = CPU::default();
     /// cpu.set_v(0x4, 0x41).unwrap();
@@ -288,7 +288,7 @@ impl CPU {
     /// Gets a slice of the entire general purpose registers
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// // Create a new CPU, and set v4 to 0x41
     /// let mut cpu = CPU::default();
     /// cpu.set_v(0x0, 0x41);
@@ -304,7 +304,7 @@ impl CPU {
     /// Gets the program counter
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// assert_eq!(0x200, cpu.pc());
     /// ```
@@ -315,7 +315,7 @@ impl CPU {
     /// Gets the I register
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// assert_eq!(0, cpu.i());
     /// ```
@@ -326,7 +326,7 @@ impl CPU {
     /// Gets the value in the Sound Timer register
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// assert_eq!(0, cpu.sound());
     /// ```
@@ -337,7 +337,7 @@ impl CPU {
     /// Gets the value in the Delay Timer register
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// assert_eq!(0, cpu.delay());
     /// ```
@@ -351,7 +351,7 @@ impl CPU {
     /// updated even when the CPU is in drawpause or keypause
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// assert_eq!(0x0, cpu.cycle());
     /// ```
@@ -363,7 +363,7 @@ impl CPU {
     /// reinitializing the program counter to 0x200
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::new(
     ///     0xf00,
     ///     0x50,
@@ -416,7 +416,7 @@ impl CPU {
     /// Gets a slice of breakpoints
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// assert_eq!(cpu.breakpoints(), &[]);
     /// ```
@@ -433,7 +433,7 @@ impl CPU {
     /// NOTE: does not synchronize with delay timers
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// let mut bus = bus!{
     ///     Program [0x0200..0x0f00] = &[
@@ -459,7 +459,7 @@ impl CPU {
     /// Ticks the timers every `rate` ticks
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// let mut bus = bus!{
     ///     Program [0x0200..0x0f00] = &[
@@ -524,7 +524,7 @@ impl CPU {
     /// Executes a single instruction
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// let mut bus = bus!{
     ///     Program [0x0200..0x0f00] = &[
@@ -540,7 +540,7 @@ impl CPU {
     /// ```
     /// Returns [Error::UnimplementedInstruction] if the instruction is not implemented.
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// # use chirp::error::Error;
     /// let mut cpu = CPU::default();
     /// # cpu.flags.debug = true;        // enable live disassembly
@@ -610,7 +610,7 @@ impl CPU {
     /// Dumps the current state of all CPU registers, and the cycle count
     /// # Examples
     /// ```rust
-    /// # use chirp::prelude::*;
+    /// # use chirp::*;
     /// let mut cpu = CPU::default();
     /// cpu.dump();
     /// ```
@@ -663,7 +663,7 @@ impl Default for CPU {
     ///
     /// # Examples
     /// ```rust
-    /// use chirp::prelude::*;
+    /// use chirp::*;
     /// let mut cpu = CPU::default();
     /// ```
     fn default() -> Self {
@@ -688,9 +688,6 @@ impl Default for CPU {
         }
     }
 }
-
-// Below this point, comments may be duplicated per impl' block,
-// since some opcodes handle multiple instructions.
 
 impl CPU {
     /// Executes a single [Insn]
@@ -735,6 +732,9 @@ impl CPU {
         }
     }
 }
+
+// Below this point, comments may be duplicated per impl' block,
+// since some opcodes handle multiple instructions.
 
 // |`0aaa`| Issues a "System call" (ML routine)
 //

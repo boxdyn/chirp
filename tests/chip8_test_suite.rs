@@ -1,6 +1,6 @@
 //! These are a series of interpreter tests using Timendus's incredible test suite
 
-pub use chirp::prelude::*;
+pub use chirp::*;
 
 fn setup_environment() -> (CPU, Bus) {
     let mut cpu = CPU::default();
