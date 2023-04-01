@@ -14,6 +14,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Error type for Chirp.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Represents a breakpoint being hit
+    #[error("Breakpoint hit: {addr:03x} ({next:04x})")]
+    BreakpointHit {
+        /// The address of the breakpoint
+        addr: u16,
+        /// The instruction after the breakpoint
+        next: u16,
+    },
     /// Represents an unimplemented operation
     #[error("Unrecognized opcode: {word:04x}")]
     UnimplementedInstruction {

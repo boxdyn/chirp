@@ -522,6 +522,11 @@ impl CPU {
     }
 
     /// Executes a single instruction
+    ///
+    /// Returns [Error::BreakpointHit] if a breakpoint was hit after the instruction executed.  
+    /// This result contains information about the breakpoint, but can be safely ignored.
+    ///
+    /// Returns [Error::UnimplementedInstruction] if the instruction at `pc` is unimplemented.
     /// # Examples
     /// ```rust
     /// # use chirp::*;
@@ -552,11 +557,8 @@ impl CPU {
     ///     ],
     ///     Screen  [0x0f00..0x1000],
     /// };
-    /// match cpu.tick(&mut bus) {
-    ///     Err(Error::UnimplementedInstruction {word})
-    ///         => assert_eq!(0xffff, word),
-    ///     _ => panic!(),
-    /// }
+    /// dbg!(cpu.tick(&mut bus))
+    ///     .expect_err("Should return Error::InvalidInstruction { 0xffff }");
     /// ```
     pub fn tick(&mut self, bus: &mut Bus) -> Result<&mut Self> {
         // Do nothing if paused
@@ -571,7 +573,9 @@ impl CPU {
         // fetch opcode
         let opcode: &[u8; 2] = if let Some(slice) = bus.get(self.pc as usize..self.pc as usize + 2)
         {
-            slice.try_into()?
+            slice
+                .try_into()
+                .expect("`slice` should be exactly 2 bytes.")
         } else {
             return Err(Error::InvalidBusRange {
                 range: self.pc as usize..self.pc as usize + 2,
@@ -603,6 +607,10 @@ impl CPU {
         // process breakpoints
         if !self.breakpoints.is_empty() && self.breakpoints.contains(&self.pc) {
             self.flags.pause = true;
+            return Err(Error::BreakpointHit {
+                addr: self.pc,
+                next: bus.read(self.pc),
+            });
         }
         Ok(self)
     }

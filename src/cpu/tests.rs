@@ -939,6 +939,7 @@ mod io {
             output: &'static [u8],
         }
 
+        /// Verify the character sprite addresses with the data they should return
         #[rustfmt::skip]
         const TESTS: [SpriteTest; 16] = [
             SpriteTest { input: 0x0, output: &[0xf0, 0x90, 0x90, 0x90, 0xf0] },
@@ -1121,15 +1122,51 @@ mod behavior {
         }
     }
     mod breakpoint {
+
         use super::*;
         #[test]
+        #[cfg_attr(feature = "unstable", no_coverage)]
         fn hit_break() {
             let (mut cpu, mut bus) = setup_environment();
             cpu.set_break(0x202);
-            cpu.multistep(&mut bus, 10)
-                .expect("Running valid instructions should always succeed");
+            match cpu.multistep(&mut bus, 10) {
+                Err(crate::error::Error::BreakpointHit { addr, next }) => {
+                    assert_eq!(0x202, addr); // current address is 202
+                    assert_eq!(0x1204, next); // next insn is `jmp 204`
+                }
+                other => unreachable!("{:?}", other),
+            }
             assert!(cpu.flags.pause);
             assert_eq!(0x202, cpu.pc);
+        }
+        #[test]
+        #[cfg_attr(feature = "unstable", no_coverage)]
+        fn hit_break_singlestep() {
+            let (mut cpu, mut bus) = setup_environment();
+            cpu.set_break(0x202);
+            match cpu.singlestep(&mut bus) {
+                Err(crate::error::Error::BreakpointHit { addr, next }) => {
+                    assert_eq!(0x202, addr); // current address is 202
+                    assert_eq!(0x1204, next); // next insn is `jmp 204`
+                }
+                other => unreachable!("{:?}", other),
+            }
+            assert!(cpu.flags.pause);
+            assert_eq!(0x202, cpu.pc);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(feature = "unstable", no_coverage)]
+    fn invalid_pc() {
+        let (mut cpu, mut bus) = setup_environment();
+        // The bus extends from 0x0..0x1000
+        cpu.pc = 0xfff;
+        match cpu.tick(&mut bus) {
+            Err(Error::InvalidBusRange { range }) => {
+                eprintln!("InvalidBusRange {{ {range:04x?} }}")
+            }
+            other => unreachable!("{other:04x?}"),
         }
     }
 }
