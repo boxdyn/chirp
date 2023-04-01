@@ -45,8 +45,7 @@ fn run_screentest(test: SuiteTest, mut cpu: CPU, mut bus: Bus) {
 
 #[test]
 fn splash_screen() {
-    let (mut c, b) = setup_environment();
-    c.flags.quirks = true.into();
+    let (c, b) = setup_environment();
     run_screentest(
         SuiteTest {
             program: include_bytes!("chip8-test-suite/bin/chip8-test-suite.ch8"),
@@ -59,45 +58,42 @@ fn splash_screen() {
 
 #[test]
 fn ibm_logo() {
-    let (mut c, mut b) = setup_environment();
-    c.flags.quirks = true.into();
-    b.write(0x1ffu16, 1u8);
+    let (cpu, mut bus) = setup_environment();
+    bus.write(0x1ffu16, 1u8);
     run_screentest(
         SuiteTest {
             program: include_bytes!("chip8-test-suite/bin/chip8-test-suite.ch8"),
             screen: include_bytes!("screens/chip8-test-suite/IBM.bin"),
         },
-        c,
-        b,
+        cpu,
+        bus,
     )
 }
 
 #[test]
 fn flags_test() {
-    let (mut c, mut b) = setup_environment();
-    c.flags.quirks = true.into();
-    b.write(0x1ffu16, 3u8);
+    let (cpu, mut bus) = setup_environment();
+    bus.write(0x1ffu16, 3u8);
     run_screentest(
         SuiteTest {
             program: include_bytes!("chip8-test-suite/bin/chip8-test-suite.ch8"),
             screen: include_bytes!("screens/chip8-test-suite/flags.bin"),
         },
-        c,
-        b,
+        cpu,
+        bus,
     )
 }
 
 #[test]
 fn quirks_test() {
-    let (mut c, mut b) = setup_environment();
-    c.flags.quirks = true.into();
-    b.write(0x1feu16, 0x0104u16);
+    let (cpu, mut bus) = setup_environment();
+    bus.write(0x1feu16, 0x0104u16);
     run_screentest(
         SuiteTest {
             program: include_bytes!("chip8-test-suite/bin/chip8-test-suite.ch8"),
             screen: include_bytes!("screens/chip8-test-suite/quirks.bin"),
         },
-        c,
-        b,
+        cpu,
+        bus,
     )
 }

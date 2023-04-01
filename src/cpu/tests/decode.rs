@@ -13,7 +13,7 @@ fn run_single_op(op: &[u8]) -> CPU {
         },
     );
     cpu.v = *INDX;
-    cpu.flags.quirks = Quirks::from(true);
+    cpu.flags.quirks = Quirks::from(false);
     cpu.tick(&mut bus).unwrap(); // will panic if unimplemented
     cpu
 }

@@ -117,10 +117,10 @@ impl State {
                     options.breakpoints,
                     ControlFlags {
                         quirks: chirp::cpu::Quirks {
-                            bin_ops: !options.vfreset,
-                            shift: !options.shift,
-                            draw_wait: !options.drawsync,
-                            dma_inc: !options.memory,
+                            bin_ops: options.vfreset,
+                            shift: options.shift,
+                            draw_wait: options.drawsync,
+                            dma_inc: options.memory,
                             stupid_jumps: options.jumping,
                         },
                         debug: options.debug,

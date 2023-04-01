@@ -331,66 +331,136 @@ mod math {
             }
         }
     }
+    mod or {
+        use super::*;
 
-    /// 8xy1: Performs bitwise or of vX and vY, and stores the result in vX
-    // TODO: Test with bin_ops quirk flag set
-    #[test]
-    fn or_inaccurate() {
-        let (mut cpu, _) = setup_environment();
-        cpu.flags.quirks.bin_ops = false;
-        for word in 0..=0xffff {
-            let (a, b) = (word as u8, (word >> 4) as u8);
-            let expected_result = a | b;
-            for reg in 0..=0xff {
-                let (x, y) = (reg & 0xf, reg >> 4);
+        /// 8xy1: Performs bitwise or of vX and vY, and stores the result in vX
+        #[test]
+        fn or() {
+            let (mut cpu, _) = setup_environment();
+            for word in 0..=0xffff {
+                let (a, b) = (word as u8, (word >> 4) as u8);
+                let expected_result = a | b;
+                for reg in 0..=0xff {
+                    let (x, y) = (reg & 0xf, reg >> 4);
 
-                (cpu.v[x], cpu.v[y]) = (a, b);
+                    cpu.v[0xf] = 0xc5; // sentinel
+                    (cpu.v[x], cpu.v[y]) = (a, b);
 
-                cpu.or(x, y);
+                    cpu.or(x, y);
 
-                assert_eq!(cpu.v[x], if x == y { b } else { expected_result });
+                    if x != 0xf {
+                        assert_eq!(cpu.v[x], if x == y { b } else { expected_result });
+                    }
+                    assert_eq!(cpu.v[0xf], 0);
+                }
+            }
+        }
+        /// Same test, with [Quirks::bin_ops] flag set
+        #[test]
+        fn or_quirk() {
+            let (mut cpu, _) = setup_environment();
+            cpu.flags.quirks.bin_ops = true;
+            for word in 0..=0xffff {
+                let (a, b) = (word as u8, (word >> 4) as u8);
+                let expected_result = a | b;
+                for reg in 0..=0xff {
+                    let (x, y) = (reg & 0xf, reg >> 4);
+
+                    (cpu.v[x], cpu.v[y]) = (a, b);
+
+                    cpu.or(x, y);
+
+                    assert_eq!(cpu.v[x], if x == y { b } else { expected_result });
+                }
             }
         }
     }
 
-    /// 8xy2: Performs bitwise and of vX and vY, and stores the result in vX
-    // TODO: Test with bin_ops quirk flag set
-    #[test]
-    fn and_inaccurate() {
-        let (mut cpu, _) = setup_environment();
-        cpu.flags.quirks.bin_ops = false;
-        for word in 0..=0xffff {
-            let (a, b) = (word as u8, (word >> 4) as u8);
-            let expected_result = a & b;
-            for reg in 0..=0xff {
-                let (x, y) = (reg & 0xf, reg >> 4);
+    mod and {
+        use super::*;
+        /// 8xy2: Performs bitwise and of vX and vY, and stores the result in vX
+        #[test]
+        fn and() {
+            let (mut cpu, _) = setup_environment();
+            for word in 0..=0xffff {
+                let (a, b) = (word as u8, (word >> 4) as u8);
+                let expected_result = a & b;
+                for reg in 0..=0xff {
+                    let (x, y) = (reg & 0xf, reg >> 4);
 
-                (cpu.v[x], cpu.v[y]) = (a, b);
+                    cpu.v[0xf] = 0xc5; // Sentinel
+                    (cpu.v[x], cpu.v[y]) = (a, b);
 
-                cpu.and(x, y);
+                    cpu.and(x, y);
+                    if x != 0xf {
+                        assert_eq!(cpu.v[x], if x == y { b } else { expected_result });
+                    }
+                    assert_eq!(cpu.v[0xf], 0)
+                }
+            }
+        }
+        // The same test with [Quirks::bin_ops] flag set
+        #[test]
+        fn and_quirk() {
+            let (mut cpu, _) = setup_environment();
+            cpu.flags.quirks.bin_ops = true;
+            for word in 0..=0xffff {
+                let (a, b) = (word as u8, (word >> 4) as u8);
+                let expected_result = a & b;
+                for reg in 0..=0xff {
+                    let (x, y) = (reg & 0xf, reg >> 4);
 
-                assert_eq!(cpu.v[x], if x == y { b } else { expected_result });
+                    (cpu.v[x], cpu.v[y]) = (a, b);
+
+                    cpu.and(x, y);
+
+                    assert_eq!(cpu.v[x], if x == y { b } else { expected_result });
+                }
             }
         }
     }
+    mod xor {
+        use super::*;
 
-    /// 8xy3: Performs bitwise xor of vX and vY, and stores the result in vX
-    // TODO: Test with bin_ops quirk flag set
-    #[test]
-    fn xor_inaccurate() {
-        let (mut cpu, _) = setup_environment();
-        cpu.flags.quirks.bin_ops = false;
-        for word in 0..=0xffff {
-            let (a, b) = (word as u8, (word >> 4) as u8);
-            let expected_result = a ^ b;
-            for reg in 0..=0xff {
-                let (x, y) = (reg & 0xf, reg >> 4);
+        /// 8xy3: Performs bitwise xor of vX and vY, and stores the result in vX
+        #[test]
+        fn xor() {
+            let (mut cpu, _) = setup_environment();
+            for word in 0..=0xffff {
+                let (a, b) = (word as u8, (word >> 4) as u8);
+                let expected_result = a ^ b;
+                for reg in 0..=0xff {
+                    let (x, y) = (reg & 0xf, reg >> 4);
 
-                (cpu.v[x], cpu.v[y]) = (a, b);
+                    cpu.v[0xf] = 0xc5; // Sentinel
+                    (cpu.v[x], cpu.v[y]) = (a, b);
 
-                cpu.xor(x, y);
+                    cpu.xor(x, y);
+                    if x != 0xf {
+                        assert_eq!(cpu.v[x], if x == y { 0 } else { expected_result });
+                    }
+                    assert_eq!(cpu.v[0xf], 0);
+                }
+            }
+        }
+        // The same test with [Quirks::bin_ops] flag set
+        #[test]
+        fn xor_quirk() {
+            let (mut cpu, _) = setup_environment();
+            cpu.flags.quirks.bin_ops = true;
+            for word in 0..=0xffff {
+                let (a, b) = (word as u8, (word >> 4) as u8);
+                let expected_result = a ^ b;
+                for reg in 0..=0xff {
+                    let (x, y) = (reg & 0xf, reg >> 4);
 
-                assert_eq!(cpu.v[x], if x == y { 0 } else { expected_result });
+                    (cpu.v[x], cpu.v[y]) = (a, b);
+
+                    cpu.xor(x, y);
+
+                    assert_eq!(cpu.v[x], if x == y { 0 } else { expected_result });
+                }
             }
         }
     }
@@ -445,25 +515,49 @@ mod math {
             }
         }
     }
+    mod shift_right {
+        use super::*;
+        /// 8xy6: Performs bitwise right shift of vX, stores carry-out in vF
+        #[test]
+        fn shift_right() {
+            let (mut cpu, _) = setup_environment();
+            for word in 0..=0xff {
+                for reg in 0..=0xff {
+                    let (x, y) = (reg & 0xf, reg >> 4);
+                    // set the register under test to `word`
+                    (cpu.v[x], cpu.v[y]) = (0, word);
 
-    /// 8xy6: Performs bitwise right shift of vX, stores carry-out in vF
-    // TODO: Test with authentic flag set
-    #[test]
-    fn shift_right() {
-        let (mut cpu, _) = setup_environment();
-        for word in 0..=0xff {
-            for x in 0..=0xf {
-                // set the register under test to `word`
-                cpu.v[x] = word;
+                    cpu.shift_right(x, y);
 
-                cpu.shift_right(x, x);
-
-                // if the destination is vF, the result was discarded, and only the carry was kept
-                if x != 0xf {
-                    assert_eq!(cpu.v[x], word >> 1);
+                    // if the destination is vF, the result was discarded, and only the carry was kept
+                    if x != 0xf {
+                        assert_eq!(cpu.v[x], word >> 1);
+                    }
+                    // The borrow flag for subtraction is inverted
+                    assert_eq!(cpu.v[0xf], word & 1);
                 }
-                // The borrow flag for subtraction is inverted
-                assert_eq!(cpu.v[0xf], word & 1);
+            }
+        }
+        /// The same test, with [Quirks::shift] quirk flag set
+        #[test]
+        fn shift_right_quirk() {
+            let (mut cpu, _) = setup_environment();
+            cpu.flags.quirks.shift = true;
+            for word in 0..=0xff {
+                for reg in 0..=0xff {
+                    let (x, y) = (reg & 0xf, reg >> 4);
+                    // set the register under test to `word`
+                    cpu.v[x] = word;
+
+                    cpu.shift_right(x, y);
+
+                    // if the destination is vF, the result was discarded, and only the carry was kept
+                    if x != 0xf {
+                        assert_eq!(cpu.v[x], word >> 1);
+                    }
+                    // The borrow flag for subtraction is inverted
+                    assert_eq!(cpu.v[0xf], word & 1);
+                }
             }
         }
     }
@@ -492,24 +586,49 @@ mod math {
         }
     }
 
-    /// 8X_E: Performs bitwise left shift of vX
-    // TODO: Test with authentic flag set
-    #[test]
-    fn shift_left() {
-        let (mut cpu, _) = setup_environment();
-        for word in 0..=0xff {
-            for x in 0..=0xf {
-                // set the register under test to `word`
-                cpu.v[x] = word;
+    mod shift_left {
+        use super::*;
+        #[test]
+        fn shift_left() {
+            let (mut cpu, _) = setup_environment();
+            for word in 1..=0xff {
+                for reg in 0..=0xff {
+                    let (x, y) = (reg & 0xf, reg >> 4);
+                    // set the register under test to `word`
+                    (cpu.v[x], cpu.v[y]) = dbg!(0, word);
 
-                cpu.shift_left(x, x);
+                    cpu.shift_left(x, y);
 
-                // if the destination is vF, the result was discarded, and only the carry was kept
-                if x != 0xf {
-                    assert_eq!(cpu.v[x], word << 1);
+                    // if the destination is vF, the result was discarded, and only the carry was kept
+                    if x != 0xf {
+                        assert_eq!(cpu.v[x], word << 1);
+                    }
+                    // The borrow flag for subtraction is inverted
+                    assert_eq!(cpu.v[0xf], word >> 7);
                 }
-                // The borrow flag for subtraction is inverted
-                assert_eq!(cpu.v[0xf], word >> 7);
+            }
+        }
+
+        /// 8X_E: Performs bitwise left shift of vX
+        // TODO: Test with authentic flag set
+        #[test]
+        fn shift_left_quirk() {
+            let (mut cpu, _) = setup_environment();
+            cpu.flags.quirks.shift = true;
+            for word in 0..=0xff {
+                for x in 0..=0xf {
+                    // set the register under test to `word`
+                    cpu.v[x] = word;
+
+                    cpu.shift_left(x, x);
+
+                    // if the destination is vF, the result was discarded, and only the carry was kept
+                    if x != 0xf {
+                        assert_eq!(cpu.v[x], word << 1);
+                    }
+                    // The borrow flag for subtraction is inverted
+                    assert_eq!(cpu.v[0xf], word >> 7);
+                }
             }
         }
     }
@@ -590,10 +709,10 @@ mod io {
                 screen: include_bytes!("tests/screens/BC_test.ch8/197.bin"),
                 steps: 250,
                 quirks: Quirks {
-                    bin_ops: true,
-                    shift: false,
-                    draw_wait: true,
-                    dma_inc: false,
+                    bin_ops: false,
+                    shift: true,
+                    draw_wait: false,
+                    dma_inc: true,
                     stupid_jumps: false,
                 },
             },
@@ -605,10 +724,10 @@ mod io {
                 screen: include_bytes!("tests/screens/IBM Logo.ch8/20.bin"),
                 steps: 56,
                 quirks: Quirks {
-                    bin_ops: true,
-                    shift: true,
-                    draw_wait: true,
-                    dma_inc: true,
+                    bin_ops: false,
+                    shift: false,
+                    draw_wait: false,
+                    dma_inc: false,
                     stupid_jumps: false,
                 },
             },
@@ -620,11 +739,10 @@ mod io {
                 screen: include_bytes!("tests/screens/1dcell.ch8/123342.bin"),
                 steps: 123342,
                 quirks: Quirks {
-                    bin_ops: true,
-                    shift: true,
-                    draw_wait: false,
-
-                    dma_inc: true,
+                    bin_ops: false,
+                    shift: false,
+                    draw_wait: true,
+                    dma_inc: false,
                     stupid_jumps: false,
                 },
             },
@@ -634,11 +752,10 @@ mod io {
                 screen: include_bytes!("tests/screens/1dcell.ch8/2391162.bin"),
                 steps: 2391162,
                 quirks: Quirks {
-                    bin_ops: true,
-                    shift: true,
-                    draw_wait: false,
-
-                    dma_inc: true,
+                    bin_ops: false,
+                    shift: false,
+                    draw_wait: true,
+                    dma_inc: false,
                     stupid_jumps: false,
                 },
             },
