@@ -32,6 +32,18 @@ pub enum Error {
         /// The offending [Range]
         range: Range<usize>,
     },
+    /// Tried to press a key that doesn't exist
+    #[error("Invalid key: {key:X}")]
+    InvalidKey {
+        /// The offending key
+        key: usize,
+    },
+    /// Tried to get/set an out-of-bounds register
+    #[error("Invalid register: v{reg:X}")]
+    InvalidRegister {
+        /// The offending register
+        reg: usize,
+    },
     /// Error originated in [std::io]
     #[error(transparent)]
     IoError(#[from] std::io::Error),

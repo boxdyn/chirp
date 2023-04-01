@@ -10,7 +10,7 @@ use std::{
     time::Instant,
 };
 
-use crate::{
+use chirp::{
     bus::{Bus, Region},
     error::Result,
     Chip8,
@@ -27,16 +27,14 @@ pub struct UIBuilder {
 }
 
 impl UIBuilder {
-    pub fn new(height: usize, width: usize) -> Self {
+    #[allow(dead_code)] // this code is used in tests thank you
+    pub fn new(width: usize, height: usize, rom: impl AsRef<Path>) -> Self {
         UIBuilder {
             width,
             height,
+            rom: Some(rom.as_ref().to_owned()),
             ..Default::default()
         }
-    }
-    pub fn rom(&mut self, path: impl AsRef<Path>) -> &mut Self {
-        self.rom = Some(path.as_ref().into());
-        self
     }
     pub fn build(&self) -> Result<UI> {
         let ui = UI {
@@ -147,8 +145,8 @@ impl UI {
                 self.window.set_title("Chirp  ⏸")
             } else {
                 self.window.set_title(&format!(
-                    "Chirp  ▶ {:2?}",
-                    (1.0 / self.time.elapsed().as_secs_f64()).trunc()
+                    "Chirp  ▶ {:02.02}",
+                    (1.0 / self.time.elapsed().as_secs_f64())
                 ));
             }
             if !self.window.is_open() {
@@ -177,7 +175,9 @@ impl UI {
         };
         use crate::io::Region::*;
         for key in get_keys_released() {
-            ch8.cpu.release(identify_key(key));
+            if let Some(key) = identify_key(key) {
+                ch8.cpu.release(key)?;
+            }
         }
         // handle keybinds for the UI
         for key in get_keys_pressed() {
@@ -227,7 +227,11 @@ impl UI {
                     ch8.bus.clear_region(Screen);
                 }
                 Escape => return Ok(None),
-                key => ch8.cpu.press(identify_key(key)),
+                key => {
+                    if let Some(key) = identify_key(key) {
+                        ch8.cpu.press(key)?;
+                    }
+                }
             }
         }
         self.keyboard = self.window.get_keys();
@@ -235,48 +239,28 @@ impl UI {
     }
 }
 
-pub const KEYMAP: [Key; 16] = [
-    Key::X,
-    Key::Key1,
-    Key::Key2,
-    Key::Key3,
-    Key::Q,
-    Key::W,
-    Key::E,
-    Key::A,
-    Key::S,
-    Key::D,
-    Key::Z,
-    Key::C,
-    Key::Key4,
-    Key::R,
-    Key::F,
-    Key::V,
-];
-
-pub fn identify_key(key: Key) -> usize {
+pub fn identify_key(key: Key) -> Option<usize> {
     match key {
-        Key::Key1 => 0x1,
-        Key::Key2 => 0x2,
-        Key::Key3 => 0x3,
-        Key::Key4 => 0xc,
-        Key::Q => 0x4,
-        Key::W => 0x5,
-        Key::E => 0x6,
-        Key::R => 0xD,
-        Key::A => 0x7,
-        Key::S => 0x8,
-        Key::D => 0x9,
-        Key::F => 0xE,
-        Key::Z => 0xA,
-        Key::X => 0x0,
-        Key::C => 0xB,
-        Key::V => 0xF,
-        _ => 0x10,
+        Key::Key1 => Some(0x1),
+        Key::Key2 => Some(0x2),
+        Key::Key3 => Some(0x3),
+        Key::Key4 => Some(0xc),
+        Key::Q => Some(0x4),
+        Key::W => Some(0x5),
+        Key::E => Some(0x6),
+        Key::R => Some(0xD),
+        Key::A => Some(0x7),
+        Key::S => Some(0x8),
+        Key::D => Some(0x9),
+        Key::F => Some(0xE),
+        Key::Z => Some(0xA),
+        Key::X => Some(0x0),
+        Key::C => Some(0xB),
+        Key::V => Some(0xF),
+        _ => None,
     }
 }
 
-#[cfg_attr(feature = "unstable", no_coverage)]
 pub fn debug_dump_screen(ch8: &Chip8, rom: &Path) -> Result<()> {
     let path = PathBuf::new()
         .join("src/cpu/tests/screens/")

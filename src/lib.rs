@@ -11,7 +11,6 @@
 pub mod bus;
 pub mod cpu;
 pub mod error;
-pub mod io;
 
 /// Common imports for Chirp
 pub mod prelude {
@@ -21,7 +20,6 @@ pub mod prelude {
     pub use bus::{Bus, Read, Region::*, Write};
     pub use cpu::{disassembler::Dis, ControlFlags, CPU};
     pub use error::Result;
-    pub use io::{UIBuilder, *};
 }
 
 /// Holds the state of a Chip-8

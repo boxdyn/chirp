@@ -43,47 +43,49 @@ fn setup_environment() -> (CPU, Bus) {
 }
 
 fn print_screen(bytes: &[u8]) {
-    bus! {Screen [0..0x100] = bytes}.print_screen().unwrap()
+    bus! {Screen [0..0x100] = bytes}
+        .print_screen()
+        .expect("Printing screen should not fail if Screen exists.")
 }
 
 /// Unused instructions
 mod unimplemented {
     use super::*;
     #[test]
-    #[should_panic]
     fn ins_5xyn() {
         let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0x500fu16); // 0x500f is not an instruction
-        cpu.tick(&mut bus).unwrap();
+        bus.write(0x200u16, 0x500fu16);
+        cpu.tick(&mut bus)
+            .expect_err("0x500f is not an instruction");
     }
     #[test]
-    #[should_panic]
     fn ins_8xyn() {
         let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0x800fu16); // 0x800f is not an instruction
-        cpu.tick(&mut bus).unwrap();
+        bus.write(0x200u16, 0x800fu16);
+        cpu.tick(&mut bus)
+            .expect_err("0x800f is not an instruction");
     }
     #[test]
-    #[should_panic]
     fn ins_9xyn() {
         let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0x900fu16); // 0x800f is not an instruction
-        cpu.tick(&mut bus).unwrap();
+        bus.write(0x200u16, 0x900fu16);
+        cpu.tick(&mut bus)
+            .expect_err("0x900f is not an instruction");
     }
     #[test]
-    #[should_panic]
     fn ins_exbb() {
         let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0xe00fu16); // 0xe00f is not an instruction
-        cpu.tick(&mut bus).unwrap();
+        bus.write(0x200u16, 0xe00fu16);
+        cpu.tick(&mut bus)
+            .expect_err("0xe00f is not an instruction");
     }
     // Fxbb
     #[test]
-    #[should_panic]
     fn ins_fxbb() {
         let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0xf00fu16); // 0xf00f is not an instruction
-        cpu.tick(&mut bus).unwrap();
+        bus.write(0x200u16, 0xf00fu16);
+        cpu.tick(&mut bus)
+            .expect_err("0xf00f is not an instruction");
     }
 }
 
@@ -122,6 +124,7 @@ mod sys {
 ///
 /// Basically anything that touches the program counter
 mod cf {
+
     use super::*;
     /// 1aaa: Sets the program counter to an absolute address
     #[test]
@@ -251,6 +254,24 @@ mod cf {
 
                 assert_eq!(cpu.pc, addr.wrapping_add(v0.into()));
             }
+        }
+    }
+    /// Tests `stupid_jumps` Quirk behavior
+    #[test]
+    fn jump_stupid() {
+        let (mut cpu, _) = setup_environment();
+        cpu.flags.quirks.stupid_jumps = true;
+
+        //set v[0..F] to 0123456789abcdef
+        for i in 0..0x10 {
+            cpu.v[i] = i as u8;
+        }
+        // just WHY
+        for reg in 0..0x10 {
+            // attempts to jump to 0x`reg`00 + 0
+            cpu.jump_indexed(reg * 0x100);
+            // jumps to 0x`reg`00 + v`reg` instead
+            assert_eq!(cpu.pc, reg * 0x101);
         }
     }
 }
@@ -635,12 +656,18 @@ mod io {
                 bus = bus.load_region(Program, test.program);
                 // Run the test program for the specified number of steps
                 while cpu.cycle() < test.steps {
-                    cpu.multistep(&mut bus, test.steps - cpu.cycle()).unwrap();
+                    cpu.multistep(&mut bus, test.steps - cpu.cycle())
+                        .expect("Draw tests should not contain undefined instructions");
                 }
                 // Compare the screen to the reference screen buffer
-                bus.print_screen().unwrap();
+                bus.print_screen()
+                    .expect("Printing screen should not fail if screen exists");
                 print_screen(test.screen);
-                assert_eq!(bus.get_region(Screen).unwrap(), test.screen);
+                assert_eq!(
+                    bus.get_region(Screen)
+                        .expect("Getting screen should not fail if screen exists"),
+                    test.screen
+                );
             }
         }
     }
@@ -719,7 +746,8 @@ mod io {
                     assert_eq!(0xff, cpu.v[x]);
                     // There are three parts to a button press
                     // When the button is pressed
-                    cpu.press(key);
+                    assert!(cpu.press(key).expect("Key should be pressed"));
+                    assert!(!cpu.press(key).expect("Key shouldn't be pressed again"));
                     assert!(cpu.flags.keypause);
                     assert_eq!(0xff, cpu.v[x]);
                     // When the button is held
@@ -727,7 +755,8 @@ mod io {
                     assert!(cpu.flags.keypause);
                     assert_eq!(0xff, cpu.v[x]);
                     // And when the button is released!
-                    cpu.release(key);
+                    assert!(cpu.release(key).expect("Key should be released"));
+                    assert!(!cpu.release(key).expect("Key shouldn't be released again"));
                     assert!(!cpu.flags.keypause);
                     assert_eq!(Some(key), cpu.flags.lastkey);
                     cpu.wait_for_key(x);
@@ -825,7 +854,11 @@ mod io {
                 cpu.load_sprite(reg);
 
                 let addr = cpu.i as usize;
-                assert_eq!(bus.get(addr..addr.wrapping_add(5)).unwrap(), test.output,);
+                assert_eq!(
+                    bus.get(addr..addr.wrapping_add(5))
+                        .expect("Region at addr should exist!"),
+                    test.output,
+                );
             }
         }
     }
@@ -880,17 +913,22 @@ mod io {
         const DATA: &[u8] = b"ABCDEFGHIJKLMNOP";
         // Load some test data into memory
         let addr = 0x456;
-        cpu.v.as_mut_slice().write_all(DATA).unwrap();
+        cpu.v
+            .as_mut_slice()
+            .write_all(DATA)
+            .expect("Loading test data should succeed");
         for len in 0..16 {
             // Perform DMA store
             cpu.i = addr as u16;
             cpu.store_dma(len, &mut bus);
             // Check that bus grabbed the correct data
-            let mut bus = bus.get_mut(addr..addr + DATA.len()).unwrap();
+            let bus = bus
+                .get_mut(addr..addr + DATA.len())
+                .expect("Getting a mutable slice at addr 0x0456 should not fail");
             assert_eq!(bus[0..=len], DATA[0..=len]);
             assert_eq!(bus[len + 1..], [0; 16][len + 1..]);
             // clear
-            bus.write_all(&[0; 16]).unwrap();
+            bus.fill(0);
         }
     }
 
@@ -903,7 +941,7 @@ mod io {
         // Load some test data into memory
         let addr = 0x456;
         bus.get_mut(addr..addr + DATA.len())
-            .unwrap()
+            .expect("Getting a mutable slice at addr 0x0456..0x0466 should not fail")
             .write_all(DATA)
             .unwrap();
         for len in 0..16 {
@@ -914,13 +952,14 @@ mod io {
             assert_eq!(cpu.v[0..=len], DATA[0..=len]);
             assert_eq!(cpu.v[len + 1..], [0; 16][len + 1..]);
             // clear
-            cpu.v = [0; 16];
+            cpu.v.fill(0);
         }
     }
 }
 
 mod behavior {
     use super::*;
+
     mod realtime {
         use super::*;
         use std::time::Duration;
@@ -930,7 +969,8 @@ mod behavior {
             cpu.flags.monotonic = None;
             cpu.delay = 10.0;
             for _ in 0..2 {
-                cpu.multistep(&mut bus, 8).unwrap();
+                cpu.multistep(&mut bus, 8)
+                    .expect("Running valid instructions should always succeed");
                 std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
             }
             // time is within 1 frame deviance over a theoretical 2 frame pause
@@ -942,7 +982,8 @@ mod behavior {
             cpu.flags.monotonic = None; // disable monotonic timing
             cpu.sound = 10.0;
             for _ in 0..2 {
-                cpu.multistep(&mut bus, 8).unwrap();
+                cpu.multistep(&mut bus, 8)
+                    .expect("Running valid instructions should always succeed");
                 std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
             }
             // time is within 1 frame deviance over a theoretical 2 frame pause
@@ -952,13 +993,14 @@ mod behavior {
         fn vbi_wait() {
             let (mut cpu, mut bus) = setup_environment();
             cpu.flags.monotonic = None; // disable monotonic timing
-            cpu.flags.vbi_wait = true;
+            cpu.flags.draw_wait = true;
             for _ in 0..2 {
-                cpu.multistep(&mut bus, 8).unwrap();
+                cpu.multistep(&mut bus, 8)
+                    .expect("Running valid instructions should always succeed");
                 std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
             }
             // Display wait is disabled after a 1 frame pause
-            assert!(!cpu.flags.vbi_wait);
+            assert!(!cpu.flags.draw_wait);
         }
     }
     mod breakpoint {
@@ -967,7 +1009,8 @@ mod behavior {
         fn hit_break() {
             let (mut cpu, mut bus) = setup_environment();
             cpu.set_break(0x202);
-            cpu.multistep(&mut bus, 10).unwrap();
+            cpu.multistep(&mut bus, 10)
+                .expect("Running valid instructions should always succeed");
             assert!(cpu.flags.pause);
             assert_eq!(0x202, cpu.pc);
         }

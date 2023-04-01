@@ -17,7 +17,7 @@ pub mod disassembler;
 use self::disassembler::{Dis, Insn};
 use crate::{
     bus::{Bus, Read, Region, Write},
-    error::Result,
+    error::{Error, Result},
 };
 use imperative_rs::InstructionSet;
 use owo_colors::OwoColorize;
@@ -81,10 +81,10 @@ pub struct ControlFlags {
     /// Set when the emulator is waiting for a keypress
     pub keypause: bool,
     /// Set when the emulator is waiting for a frame to be drawn
-    pub vbi_wait: bool,
+    pub draw_wait: bool,
     /// Set to the last key that's been *released* after a keypause
     pub lastkey: Option<usize>,
-    /// Represents the set of emulator "[Quirks]" to enable
+    /// Represents the set of emulator [Quirks] to enable
     pub quirks: Quirks,
     /// Represents the number of instructions to run per tick of the internal timer
     pub monotonic: Option<usize>,
@@ -95,14 +95,12 @@ impl ControlFlags {
     ///
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     assert_eq!(true, cpu.flags.debug);
-    ///     cpu.flags.debug();
-    ///     assert_eq!(false, cpu.flags.debug);
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// assert_eq!(true, cpu.flags.debug);
+    /// // Toggle debug mode
+    /// cpu.flags.debug();
+    /// assert_eq!(false, cpu.flags.debug);
     /// ```
     pub fn debug(&mut self) {
         self.debug = !self.debug
@@ -112,14 +110,12 @@ impl ControlFlags {
     ///
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     assert_eq!(false, cpu.flags.pause);
-    ///     cpu.flags.pause();
-    ///     assert_eq!(true, cpu.flags.pause);
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// assert_eq!(false, cpu.flags.pause);
+    /// // Pause the cpu
+    /// cpu.flags.pause();
+    /// assert_eq!(true, cpu.flags.pause);
     /// ```
     pub fn pause(&mut self) {
         self.pause = !self.pause
@@ -206,63 +202,90 @@ impl CPU {
         }
     }
 
-    /// Presses a key
-    /// # Examples
-    /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     cpu.press(0x7);
-    ///     cpu.press(0xF);
-    ///#    Ok(())
-    ///# }
-    /// ```
-    pub fn press(&mut self, key: usize) {
-        if (0..16).contains(&key) {
-            self.keys[key] = true;
-        }
-    }
-
-    /// Releases a key
+    /// Presses a key, and reports whether the key's state changed.  
+    /// If key does not exist, returns [Error::InvalidKey].
     ///
-    /// If keypause is enabled, this disables keypause and records the last released key.
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     cpu.press(0x7);
-    ///     cpu.release(0x7);
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    ///
+    /// // press key `7`
+    /// let did_press = cpu.press(0x7).unwrap();
+    /// assert!(did_press);
+    ///
+    /// // press key `7` again, even though it's already pressed
+    /// let did_press = cpu.press(0x7).unwrap();
+    /// // it was already pressed, so nothing's changed.
+    /// assert!(!did_press);
     /// ```
-    pub fn release(&mut self, key: usize) {
-        if (0..16).contains(&key) {
-            self.keys[key] = false;
-            if self.flags.keypause {
-                self.flags.lastkey = Some(key);
-            }
-            self.flags.keypause = false;
+    pub fn press(&mut self, key: usize) -> Result<bool> {
+        if let Some(keyref) = self.keys.get_mut(key) {
+            if !*keyref {
+                *keyref = true;
+                return Ok(true);
+            } // else do nothing
+        } else {
+            return Err(Error::InvalidKey { key });
         }
+        Ok(false)
     }
 
-    /// Sets a general purpose register in the CPU
+    /// Releases a key, and reports whether the key's state changed.  
+    /// If key is outside range `0..=0xF`, returns [Error::InvalidKey].
+    ///
+    /// If [ControlFlags::keypause] was enabled, it is disabled,
+    /// and the [ControlFlags::lastkey] is recorded.
+    /// # Examples
+    /// ```rust
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// // press key `7`
+    /// cpu.press(0x7).unwrap();
+    /// // release key `7`
+    /// let changed = cpu.release(0x7).unwrap();
+    /// assert!(changed); // key released
+    /// // try releasing `7` again
+    /// let changed = cpu.release(0x7).unwrap();
+    /// assert!(!changed); // key was not held
+    /// ```
+    pub fn release(&mut self, key: usize) -> Result<bool> {
+        if let Some(keyref) = self.keys.get_mut(key) {
+            if *keyref {
+                *keyref = false;
+                if self.flags.keypause {
+                    self.flags.lastkey = Some(key);
+                    self.flags.keypause = false;
+                }
+                return Ok(true);
+            }
+        } else {
+            return Err(Error::InvalidKey { key });
+        }
+        Ok(false)
+    }
+
+    /// Sets a general purpose register in the CPU.  
+    /// If the register doesn't exist, returns [Error::InvalidRegister]
     /// # Examples
     /// ```rust
     /// # use chirp::prelude::*;
     /// // Create a new CPU, and set v4 to 0x41
     /// let mut cpu = CPU::default();
-    /// cpu.set_v(0x4, 0x41);
+    /// cpu.set_v(0x4, 0x41).unwrap();
     /// // Dump the CPU registers
     /// cpu.dump();
     /// ```
-    pub fn set_v(&mut self, gpr: Reg, value: u8) {
-        if let Some(gpr) = self.v.get_mut(gpr) {
+    pub fn set_v(&mut self, reg: Reg, value: u8) -> Result<()> {
+        if let Some(gpr) = self.v.get_mut(reg) {
             *gpr = value;
+            Ok(())
+        } else {
+            Err(Error::InvalidRegister { reg })
         }
     }
 
-    /// Gets a slice of the entire general purpose register field
+    /// Gets a slice of the entire general purpose registers
     /// # Examples
     /// ```rust
     /// # use chirp::prelude::*;
@@ -281,12 +304,9 @@ impl CPU {
     /// Gets the program counter
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     assert_eq!(0x200, cpu.pc());
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// assert_eq!(0x200, cpu.pc());
     /// ```
     pub fn pc(&self) -> Adr {
         self.pc
@@ -295,12 +315,9 @@ impl CPU {
     /// Gets the I register
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     assert_eq!(0, cpu.i());
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// assert_eq!(0, cpu.i());
     /// ```
     pub fn i(&self) -> Adr {
         self.i
@@ -309,12 +326,9 @@ impl CPU {
     /// Gets the value in the Sound Timer register
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     assert_eq!(0, cpu.sound());
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// assert_eq!(0, cpu.sound());
     /// ```
     pub fn sound(&self) -> u8 {
         self.sound as u8
@@ -323,12 +337,9 @@ impl CPU {
     /// Gets the value in the Delay Timer register
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     assert_eq!(0, cpu.delay());
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// assert_eq!(0, cpu.delay());
     /// ```
     pub fn delay(&self) -> u8 {
         self.delay as u8
@@ -340,12 +351,9 @@ impl CPU {
     /// updated even when the CPU is in drawpause or keypause
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     assert_eq!(0x0, cpu.cycle());
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// assert_eq!(0x0, cpu.cycle());
     /// ```
     pub fn cycle(&self) -> usize {
         self.cycle
@@ -355,31 +363,28 @@ impl CPU {
     /// reinitializing the program counter to 0x200
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::new(
-    ///         0xf00,
-    ///         0x50,
-    ///         0x340,
-    ///         0xefe,
-    ///         Dis::default(),
-    ///         vec![],
-    ///         ControlFlags::default()
-    ///     );
-    ///     cpu.flags.keypause = true;
-    ///     cpu.flags.vbi_wait = true;
-    ///     assert_eq!(0x340, cpu.pc());
-    ///     cpu.soft_reset();
-    ///     assert_eq!(0x200, cpu.pc());
-    ///     assert_eq!(false, cpu.flags.keypause);
-    ///     assert_eq!(false, cpu.flags.vbi_wait);
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::new(
+    ///     0xf00,
+    ///     0x50,
+    ///     0x340,
+    ///     0xefe,
+    ///     Dis::default(),
+    ///     vec![],
+    ///     ControlFlags::default()
+    /// );
+    /// cpu.flags.keypause = true;
+    /// cpu.flags.draw_wait = true;
+    /// assert_eq!(0x340, cpu.pc());
+    /// cpu.soft_reset();
+    /// assert_eq!(0x200, cpu.pc());
+    /// assert_eq!(false, cpu.flags.keypause);
+    /// assert_eq!(false, cpu.flags.draw_wait);
     /// ```
     pub fn soft_reset(&mut self) {
         self.pc = 0x200;
         self.flags.keypause = false;
-        self.flags.vbi_wait = false;
+        self.flags.draw_wait = false;
     }
 
     /// Set a breakpoint
@@ -411,12 +416,9 @@ impl CPU {
     /// Gets a slice of breakpoints
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     assert_eq!(cpu.breakpoints(), &[]);
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// assert_eq!(cpu.breakpoints(), &[]);
     /// ```
     pub fn breakpoints(&self) -> &[Adr] {
         self.breakpoints.as_slice()
@@ -425,29 +427,29 @@ impl CPU {
     /// Unpauses the emulator for a single tick,
     /// even if cpu.flags.pause is set.
     ///
+    /// Like with [CPU::tick], this returns [Error::UnimplementedInstruction]
+    /// if the instruction is unimplemented.
+    ///
     /// NOTE: does not synchronize with delay timers
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     let mut bus = bus!{
-    ///         Program [0x0200..0x0f00] = &[
-    ///             0x00, 0xe0, // cls
-    ///             0x22, 0x02, // jump 0x202 (pc)
-    ///         ],
-    ///         Screen  [0x0f00..0x1000],
-    ///     };
-    ///     cpu.singlestep(&mut bus)?;
-    ///     assert_eq!(0x202, cpu.pc());
-    ///     assert_eq!(1, cpu.cycle());
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// let mut bus = bus!{
+    ///     Program [0x0200..0x0f00] = &[
+    ///         0x00, 0xe0, // cls
+    ///         0x22, 0x02, // jump 0x202 (pc)
+    ///     ],
+    ///     Screen  [0x0f00..0x1000],
+    /// };
+    /// cpu.singlestep(&mut bus).unwrap();
+    /// assert_eq!(0x202, cpu.pc());
+    /// assert_eq!(1, cpu.cycle());
     /// ```
     pub fn singlestep(&mut self, bus: &mut Bus) -> Result<&mut Self> {
         self.flags.pause = false;
         self.tick(bus)?;
-        self.flags.vbi_wait = false;
+        self.flags.draw_wait = false;
         self.flags.pause = true;
         Ok(self)
     }
@@ -457,21 +459,19 @@ impl CPU {
     /// Ticks the timers every `rate` ticks
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     let mut bus = bus!{
-    ///         Program [0x0200..0x0f00] = &[
-    ///             0x00, 0xe0, // cls
-    ///             0x22, 0x02, // jump 0x202 (pc)
-    ///         ],
-    ///         Screen  [0x0f00..0x1000],
-    ///     };
-    ///     cpu.multistep(&mut bus, 0x20)?;
-    ///     assert_eq!(0x202, cpu.pc());
-    ///     assert_eq!(0x20, cpu.cycle());
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// let mut bus = bus!{
+    ///     Program [0x0200..0x0f00] = &[
+    ///         0x00, 0xe0, // cls
+    ///         0x22, 0x02, // jump 0x202 (pc)
+    ///     ],
+    ///     Screen  [0x0f00..0x1000],
+    /// };
+    /// cpu.multistep(&mut bus, 0x20)
+    ///     .expect("The program should only have valid opcodes.");
+    /// assert_eq!(0x202, cpu.pc());
+    /// assert_eq!(0x20, cpu.cycle());
     /// ```
     pub fn multistep(&mut self, bus: &mut Bus, steps: usize) -> Result<&mut Self> {
         for _ in 0..steps {
@@ -497,8 +497,8 @@ impl CPU {
         }
         // Use a monotonic counter when testing
         if let Some(speed) = self.flags.monotonic {
-            if self.flags.vbi_wait {
-                self.flags.vbi_wait = self.cycle % speed != 0;
+            if self.flags.draw_wait {
+                self.flags.draw_wait = self.cycle % speed != 0;
             }
             let speed = 1.0 / speed as f64;
             self.delay -= speed;
@@ -510,7 +510,7 @@ impl CPU {
         let time = self.timers.frame.elapsed().as_secs_f64() * 60.0;
         self.timers.frame = Instant::now();
         if time > 1.0 {
-            self.flags.vbi_wait = false;
+            self.flags.draw_wait = false;
         }
         if self.delay > 0.0 {
             self.delay -= time;
@@ -524,44 +524,43 @@ impl CPU {
     /// Executes a single instruction
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     let mut bus = bus!{
-    ///         Program [0x0200..0x0f00] = &[
-    ///             0x00, 0xe0, // cls
-    ///             0x22, 0x02, // jump 0x202 (pc)
-    ///         ],
-    ///         Screen  [0x0f00..0x1000],
-    ///     };
-    ///     cpu.tick(&mut bus)?;
-    ///     assert_eq!(0x202, cpu.pc());
-    ///     assert_eq!(1, cpu.cycle());
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// let mut bus = bus!{
+    ///     Program [0x0200..0x0f00] = &[
+    ///         0x00, 0xe0, // cls
+    ///         0x22, 0x02, // jump 0x202 (pc)
+    ///     ],
+    ///     Screen  [0x0f00..0x1000],
+    /// };
+    /// cpu.tick(&mut bus)
+    ///     .expect("0x00e0 (cls) should be a valid opcode.");
+    /// assert_eq!(0x202, cpu.pc());
+    /// assert_eq!(1, cpu.cycle());
     /// ```
-    /// # Panics
-    /// Will panic if an invalid instruction is executed
-    /// ```rust,should_panic
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///#     cpu.flags.debug = true;        // enable live disassembly
-    ///#     cpu.flags.monotonic = Some(8); // enable monotonic/test timing
-    ///     let mut bus = bus!{
-    ///         Program [0x0200..0x0f00] = &[
-    ///             0xff, 0xff, // invalid!
-    ///             0x22, 0x02, // jump 0x202 (pc)
-    ///         ],
-    ///         Screen  [0x0f00..0x1000],
-    ///     };
-    ///     cpu.tick(&mut bus)?; // panics!
-    ///#    Ok(())
-    ///# }
+    /// Returns [Error::UnimplementedInstruction] if the instruction is not implemented.
+    /// ```rust
+    /// # use chirp::prelude::*;
+    /// # use chirp::error::Error;
+    /// let mut cpu = CPU::default();
+    /// # cpu.flags.debug = true;        // enable live disassembly
+    /// # cpu.flags.monotonic = Some(8); // enable monotonic/test timing
+    /// let mut bus = bus!{
+    ///     Program [0x0200..0x0f00] = &[
+    ///         0xff, 0xff, // invalid!
+    ///         0x22, 0x02, // jump 0x202 (pc)
+    ///     ],
+    ///     Screen  [0x0f00..0x1000],
+    /// };
+    /// match cpu.tick(&mut bus) {
+    ///     Err(Error::UnimplementedInstruction {word})
+    ///         => assert_eq!(0xffff, word),
+    ///     _ => panic!(),
+    /// }
     /// ```
     pub fn tick(&mut self, bus: &mut Bus) -> Result<&mut Self> {
         // Do nothing if paused
-        if self.flags.pause || self.flags.vbi_wait || self.flags.keypause {
+        if self.flags.pause || self.flags.draw_wait || self.flags.keypause {
             // always tick in test mode
             if self.flags.monotonic.is_some() {
                 self.cycle += 1;
@@ -574,7 +573,7 @@ impl CPU {
         {
             slice.try_into()?
         } else {
-            return Err(crate::error::Error::InvalidBusRange {
+            return Err(Error::InvalidBusRange {
                 range: self.pc as usize..self.pc as usize + 2,
             });
         };
@@ -631,7 +630,7 @@ impl CPU {
                 Insn::dmai { x } => self.load_dma(x, bus),
             }
         } else {
-            return Err(crate::error::Error::UnimplementedInstruction {
+            return Err(Error::UnimplementedInstruction {
                 word: u16::from_be_bytes(*opcode),
             });
         }
@@ -646,12 +645,9 @@ impl CPU {
     /// Dumps the current state of all CPU registers, and the cycle count
     /// # Examples
     /// ```rust
-    ///# use chirp::prelude::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut cpu = CPU::default();
-    ///     cpu.dump();
-    ///#    Ok(())
-    ///# }
+    /// # use chirp::prelude::*;
+    /// let mut cpu = CPU::default();
+    /// cpu.dump();
     /// ```
     /// outputs
     /// ```text
@@ -992,7 +988,7 @@ impl CPU {
     fn draw(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut Bus) {
         let (x, y) = (self.v[x] as u16 % 64, self.v[y] as u16 % 32);
         if self.flags.quirks.draw_wait {
-            self.flags.vbi_wait = true;
+            self.flags.draw_wait = true;
         }
         self.v[0xf] = 0;
         for byte in 0..n as u16 {
@@ -1003,7 +999,8 @@ impl CPU {
             let addr = (y + byte) * 8 + (x & 0x3f) / 8 + self.screen;
             // Read a byte of sprite data into a u16, and shift it x % 8 bits
             let sprite: u8 = bus.read(self.i + byte);
-            let sprite = (sprite as u16) << (8 - (x & 7)) & if x % 64 > 56 { 0xff00 } else { 0xffff };
+            let sprite =
+                (sprite as u16) << (8 - (x & 7)) & if x % 64 > 56 { 0xff00 } else { 0xffff };
             // Read a u16 from the bus containing the two bytes which might need to be updated
             let mut screen: u16 = bus.read(addr);
             // Save the bits-toggled-off flag if necessary
@@ -1144,12 +1141,7 @@ impl CPU {
     #[inline(always)]
     fn load_dma(&mut self, x: Reg, bus: &mut Bus) {
         let i = self.i as usize;
-        for (reg, value) in bus
-            .get(i..=i + x)
-            .unwrap_or_default()
-            .iter()
-            .enumerate()
-        {
+        for (reg, value) in bus.get(i..=i + x).unwrap_or_default().iter().enumerate() {
             self.v[reg] = *value;
         }
         if self.flags.quirks.dma_inc {

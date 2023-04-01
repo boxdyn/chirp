@@ -4,8 +4,13 @@
 //! Chirp: A chip-8 interpreter in Rust
 //! Hello, world!
 
+mod io;
+#[cfg(test)]
+mod tests;
+
 use chirp::{error::Result, prelude::*};
 use gumdrop::*;
+use io::*;
 use owo_colors::OwoColorize;
 use std::fs::read;
 use std::{
@@ -95,7 +100,7 @@ impl State {
             ch8: Chip8 {
                 bus: bus! {
                     // Load the charset into ROM
-                    Charset [0x0050..0x00A0] = include_bytes!("../mem/charset.bin"),
+                    Charset [0x0050..0x00A0] = include_bytes!("../../mem/charset.bin"),
                     // Load the ROM file into RAM
                     Program [0x0200..0x1000] = &read(&options.file)?,
                     // Create a screen
@@ -125,7 +130,7 @@ impl State {
                     },
                 ),
             },
-            ui: UIBuilder::default().rom(&options.file).build()?,
+            ui: UIBuilder::new(64, 32, &options.file).build()?,
             ft: Instant::now(),
         };
         state.ch8.bus.write(0x1feu16, options.data);
