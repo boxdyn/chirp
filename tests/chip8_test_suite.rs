@@ -24,13 +24,13 @@ fn setup_environment() -> (CPU, Bus) {
 }
 
 struct SuiteTest {
-    program: &'static [u8],
+    test: u16,
     screen: &'static [u8],
 }
 
 fn run_screentest(test: SuiteTest, mut cpu: CPU, mut bus: Bus) {
-    // Load the test program
-    bus = bus.load_region(Program, test.program);
+    // Set the test to run
+    bus.write(0x1feu16, test.test);
     // The test suite always initiates a keypause on test completion
     while !cpu.flags.keypause {
         cpu.multistep(&mut bus, 8).unwrap();
@@ -48,7 +48,7 @@ fn splash_screen() {
     let (cpu, bus) = setup_environment();
     run_screentest(
         SuiteTest {
-            program: include_bytes!("chip8-test-suite/bin/chip8-test-suite.ch8"),
+            test: 0,
             screen: include_bytes!("screens/chip8-test-suite/splash.bin"),
         },
         cpu,
@@ -58,11 +58,10 @@ fn splash_screen() {
 
 #[test]
 fn ibm_logo() {
-    let (cpu, mut bus) = setup_environment();
-    bus.write(0x1ffu16, 1u8);
+    let (cpu, bus) = setup_environment();
     run_screentest(
         SuiteTest {
-            program: include_bytes!("chip8-test-suite/bin/chip8-test-suite.ch8"),
+            test: 0x01,
             screen: include_bytes!("screens/chip8-test-suite/IBM.bin"),
         },
         cpu,
@@ -72,11 +71,10 @@ fn ibm_logo() {
 
 #[test]
 fn flags_test() {
-    let (cpu, mut bus) = setup_environment();
-    bus.write(0x1ffu16, 3u8);
+    let (cpu, bus) = setup_environment();
     run_screentest(
         SuiteTest {
-            program: include_bytes!("chip8-test-suite/bin/chip8-test-suite.ch8"),
+            test: 0x03,
             screen: include_bytes!("screens/chip8-test-suite/flags.bin"),
         },
         cpu,
@@ -86,11 +84,10 @@ fn flags_test() {
 
 #[test]
 fn quirks_test() {
-    let (cpu, mut bus) = setup_environment();
-    bus.write(0x1feu16, 0x0104u16);
+    let (cpu, bus) = setup_environment();
     run_screentest(
         SuiteTest {
-            program: include_bytes!("chip8-test-suite/bin/chip8-test-suite.ch8"),
+            test: 0x0104,
             screen: include_bytes!("screens/chip8-test-suite/quirks.bin"),
         },
         cpu,
