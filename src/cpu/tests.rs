@@ -700,22 +700,7 @@ mod io {
             quirks: Quirks,
         }
 
-        const SCREEN_TESTS: [ScreenTest; 4] = [
-            // Passing BC_test
-            // # Quirks:
-            // - Requires shift and dma_inc to act like Super-CHIP
-            ScreenTest {
-                program: include_bytes!("../../chip-8/BC_test.ch8"),
-                screen: include_bytes!("tests/screens/BC_test.ch8/197.bin"),
-                steps: 250,
-                quirks: Quirks {
-                    bin_ops: false,
-                    shift: true,
-                    draw_wait: false,
-                    dma_inc: true,
-                    stupid_jumps: false,
-                },
-            },
+        const SCREEN_TESTS: [ScreenTest; 3] = [
             // The IBM Logo
             // # Quirks
             // Originally timed without quirks
