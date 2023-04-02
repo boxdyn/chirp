@@ -507,8 +507,9 @@ impl CPU {
         };
 
         // Convert the elapsed time to 60ths of a second
-        let time = self.timers.frame.elapsed().as_secs_f64() * 60.0;
-        self.timers.frame = Instant::now();
+        let frame = Instant::now();
+        let time = (frame - self.timers.frame).as_secs_f64() * 60.0;
+        self.timers.frame = frame;
         if time > 1.0 {
             self.flags.draw_wait = false;
         }
