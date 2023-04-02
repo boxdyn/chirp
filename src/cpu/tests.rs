@@ -37,7 +37,7 @@ fn setup_environment() -> (CPU, Bus) {
             // Load the ROM file into RAM (dummy binary which contains nothing but `jmp pc+2`)
             Program [0x0200..0x1000] = include_bytes!("tests/roms/jumptest.ch8"),
             // Create a screen
-            Screen  [0x0F00..0x1000] = include_bytes!("../../tests/chip8Archive/roms/1dcell.ch8"),
+            Screen  [0x0F00..0x1000] = include_bytes!("../../chip8Archive/roms/1dcell.ch8"),
         },
     )
 }

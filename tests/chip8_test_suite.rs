@@ -16,9 +16,9 @@ fn setup_environment() -> (CPU, Bus) {
             // Load the charset into ROM
             Charset [0x0050..0x00A0] = include_bytes!("../src/mem/charset.bin"),
             // Load the ROM file into RAM
-            Program [0x0200..0x1000] = include_bytes!("../chip-8/BC_test.ch8"),
-            // Create a screen
-            Screen  [0x0F00..0x1000] = include_bytes!("../chip-8/IBM Logo.ch8"),
+            Program [0x0200..0x1000] = include_bytes!("../chip8-test-suite/bin/chip8-test-suite.ch8"),
+            // Create a screen, and fill it with garbage data
+            Screen  [0x0F00..0x1000] = include_bytes!("chip8_test_suite.rs"),
         },
     )
 }
@@ -45,14 +45,14 @@ fn run_screentest(test: SuiteTest, mut cpu: CPU, mut bus: Bus) {
 
 #[test]
 fn splash_screen() {
-    let (c, b) = setup_environment();
+    let (cpu, bus) = setup_environment();
     run_screentest(
         SuiteTest {
             program: include_bytes!("chip8-test-suite/bin/chip8-test-suite.ch8"),
             screen: include_bytes!("screens/chip8-test-suite/splash.bin"),
         },
-        c,
-        b,
+        cpu,
+        bus,
     )
 }
 
