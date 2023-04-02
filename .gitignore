@@ -2,6 +2,8 @@
 # Rust files
 /target
 Cargo.lock
+flamegraph.svg
+perf.data*
 
 # Chip-8 test ROMs
 /chip-8
