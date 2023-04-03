@@ -227,7 +227,7 @@ mod quirks {
                 shift: true,
                 draw_wait: true,
                 dma_inc: true,
-                stupid_jumps: false,
+                stupid_jumps: true,
             }
         )
     }
