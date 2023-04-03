@@ -78,7 +78,7 @@ pub enum Insn {
     rand { B: u8, x: usize },
     /// | Dxyn | Draws n-byte sprite to the screen at coordinates (vX, vY)
     #[opcode = "0xdxyn"]
-    draw { x: usize, y: usize, n: u8 },
+    draw { y: usize, x: usize, n: u8 },
     /// | eX9e | Skip next instruction if key == vX
     #[opcode = "0xex9e"]
     sek { x: usize },
@@ -170,7 +170,7 @@ impl Display for Insn {
             Insn::movI { A }       => write!(f, "mov    ${A:03x}, I"),
             Insn::jmpr { A }       => write!(f, "jmp    ${A:03x}+v0"),
             Insn::rand { B, x }    => write!(f, "rand   #{B:02x}, v{x:X}"),
-            Insn::draw { x, y, n } => write!(f, "draw   #{n:x}, v{x:X}, v{y:X}"),
+            Insn::draw { y, x, n } => write!(f, "draw   #{n:x}, v{x:X}, v{y:X}"),
             Insn::sek { x }        => write!(f, "sek    v{x:X}"),
             Insn::snek { x }       => write!(f, "snek   v{x:X}"),
             Insn::getdt { x }      => write!(f, "mov    DT, v{x:X}"),

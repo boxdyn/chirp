@@ -788,11 +788,11 @@ impl CPU {
             Insn::dmai  { x       } => self.load_dma(x, bus),
             // Super-Chip extensions
             Insn::scd   {       n } => self.scroll_down(n, bus),
-            Insn::scr               => self.scr(bus),
-            Insn::scl               => self.scl(bus),
+            Insn::scr               => self.scroll_right(bus),
+            Insn::scl               => self.scroll_left(bus),
             Insn::halt              => self.flags.pause(),
-            Insn::lores             => self.flags.draw_mode = false,
-            Insn::hires             => self.flags.draw_mode = true,
+            Insn::lores             => self.init_lores(bus),
+            Insn::hires             => self.init_hires(bus),
             Insn::hfont { x       } => self.load_big_sprite(x),
             Insn::flgo  { x       } => self.store_flags(x, bus),
             Insn::flgi  { x       } => self.load_flags(x, bus),
@@ -820,37 +820,6 @@ impl CPU {
     fn ret(&mut self, bus: &impl Read<u16>) {
         self.sp = self.sp.wrapping_add(2);
         self.pc = bus.read(self.sp);
-    }
-
-    /// |`00cN`| Scroll the screen down N lines
-    #[inline(always)]
-    fn scroll_down(&mut self, n: Nib, bus: &mut Bus) {
-        // Get a line from the bus
-        for i in (16 * n as usize..16 * 15).step_by(16).rev() {
-            let i = i + self.screen as usize;
-            let line: u128 = bus.read(i);
-            bus.write(i - (n as usize * 16), line);
-            bus.write(i, 0u128);
-        }
-    }
-
-    /// |`00fb`| Scroll the screen right
-    #[inline(always)]
-    fn scr(&mut self, bus: &mut (impl Read<u128> + Write<u128>)) {
-        // Get a line from the bus
-        for i in (0..16 * 64).step_by(16) {
-            //let line: u128 = bus.read(self.screen + i) >> 4;
-            bus.write(self.screen + i, bus.read(self.screen + i) >> 4);
-        }
-    }
-    /// |`00fc`| Scroll the screen right
-    #[inline(always)]
-    fn scl(&mut self, bus: &mut (impl Read<u128> + Write<u128>)) {
-        // Get a line from the bus
-        for i in (0..16 * 64).step_by(16) {
-            let line: u128 = (bus.read(self.screen + i) & !(0xf << 124)) << 4;
-            bus.write(self.screen + i, line);
-        }
     }
 }
 
@@ -1081,15 +1050,6 @@ impl CPU {
     }
 }
 
-/// TODO: Do this more idiomatically, using some iterator chain?
-fn doublewide(value: u16) -> u32 {
-    let mut out: u32 = 0;
-    for i in 0..16 {
-        out |= ((value as u32 & 0x1 << i) * 3) << i;
-    }
-    out
-}
-
 // |`Dxyn`| Draws n-byte sprite to the screen at coordinates (vX, vY)
 impl CPU {
     /// |`Dxyn`| Draws n-byte sprite to the screen at coordinates (vX, vY)
@@ -1098,84 +1058,40 @@ impl CPU {
     /// On the original chip-8 interpreter, this will wait for a VBI
     #[inline(always)]
     fn draw(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut Bus) {
-        // lmaotch
-        match self.flags.draw_mode {
-            true => self.draw_hires(x, y, n, bus),
-            false => self.draw_lores(x, y, n, bus),
-        }
-    }
-    #[inline(always)]
-    fn draw_lores(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut Bus) {
         if !self.flags.quirks.draw_wait {
             self.flags.draw_wait = true;
         }
-        let (w, h) = (64, 32);
-        let (x, y) = (self.v[x] as u16 % w, self.v[y] as u16 % h);
+        // self.draw_hires handles both hi-res mode and drawing 16x16 sprites
+        if self.flags.draw_mode || n == 0 {
+            self.draw_hires(x, y, n, bus);
+        } else {
+            self.draw_lores(x, y, n, bus);
+        }
+    }
+
+    #[inline(always)]
+    fn draw_lores(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut Bus) {
+        self.draw_sprite(self.v[x] as u16 % 64, self.v[y] as u16 % 32, n, 64, 32, bus);
+    }
+
+    #[inline(always)]
+    fn draw_sprite(&mut self, x: u16, y: u16, n: Nib, w: u16, h: u16, bus: &mut Bus) {
+        let w_bytes = w / 8;
         self.v[0xf] = 0;
         if let Some(sprite) = bus.get(self.i as usize..(self.i + n as u16) as usize) {
             let sprite = sprite.to_vec();
-            for (line, sprite) in sprite.iter().enumerate() {
-                let (line, sprite) = (line as u16, *sprite);
-                // clip
+            for (line, &sprite) in sprite.iter().enumerate() {
+                let line = line as u16;
                 if y + line >= h {
                     break;
                 }
-                // clip
                 let sprite = (sprite as u16) << (8 - (x % 8))
                     & if (x % w) >= (w - 8) { 0xff00 } else { 0xffff };
-                // scale
-                let addr = |x, y| -> u16 { ((y + (2 * line)) * 8 + (x / 8)) * 2 + self.screen };
-                let y = y << 1;
-                let sprite = doublewide(sprite);
-                for scale in 0..2 {
-                    let screen: u32 = bus.read(addr(x, y + scale));
-                    bus.write(addr(x, y + scale), screen ^ sprite);
-                    if screen & sprite != 0 {
-                        self.v[0xf] = 1;
-                    }
-                }
-            }
-        }
-    }
-    // Super-Chip extension high-resolution graphics mode
-    #[inline(always)]
-    fn draw_hires(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut Bus) {
-        if !self.flags.quirks.draw_wait {
-            self.flags.draw_wait = true;
-        }
-        let (w, h) = (128, 64);
-        let (x, y) = (self.v[x] as u16 % w, self.v[y] as u16 % h);
-        let w_bytes = w / 8;
-        self.v[0xf] = 0;
-        if n == 0 {
-            if let Some(sprite) = bus.get(self.i as usize..(self.i + 32) as usize) {
-                let sprite = sprite.to_owned();
-                for (line, sprite) in sprite.chunks(2).enumerate() {
-                    let sprite = u16::from_be_bytes(
-                        sprite
-                            .try_into()
-                            .expect("Chunks should only return 2 bytes"),
-                    );
-                    let addr = (y + line as u16) * w_bytes + x / 8 + self.screen;
-                    let sprite = (sprite as u32) << (16 - (x % 8));
-                    let screen: u32 = bus.read(addr);
-                    bus.write(addr, screen ^ sprite);
-                    if screen & sprite != 0 {
-                        self.v[0xf] += 1;
-                    }
-                }
-            }
-        } else {
-            if let Some(sprite) = bus.get(self.i as usize..(self.i + n as u16) as usize) {
-                let sprite = sprite.to_vec();
-                for (line, sprite) in sprite.iter().enumerate() {
-                    let addr = (y + line as u16) * w_bytes + x / 8 + self.screen;
-                    let sprite = (*sprite as u16) << (8 - (x % 8));
-                    let screen: u16 = bus.read(addr);
-                    bus.write(addr, screen ^ sprite);
-                    if screen & sprite != 0 {
-                        self.v[0xf] += 1;
-                    }
+                let addr = |x, y| -> u16 { (y + line) * w_bytes + (x / 8) + self.screen };
+                let screen: u16 = bus.read(addr(x, y));
+                bus.write(addr(x, y), screen ^ sprite);
+                if screen & sprite != 0 {
+                    self.v[0xf] = 1;
                 }
             }
         }
@@ -1192,16 +1108,14 @@ impl CPU {
     /// |`Ex9E`| Skip next instruction if key == vX
     #[inline(always)]
     fn skip_key_equals(&mut self, x: Reg) {
-        let x = self.v[x] as usize;
-        if self.keys[x] {
+        if self.keys[self.v[x] as usize & 0xf] {
             self.pc += 2;
         }
     }
     /// |`ExaE`| Skip next instruction if key != vX
     #[inline(always)]
     fn skip_key_not_equals(&mut self, x: Reg) {
-        let x = self.v[x] as usize;
-        if !self.keys[x] {
+        if !self.keys[self.v[x] as usize & 0xf] {
             self.pc += 2;
         }
     }
@@ -1315,8 +1229,99 @@ impl CPU {
             self.i += x as Adr + 1;
         }
     }
+}
+
+//////////////// SUPER CHIP ////////////////
+
+impl CPU {
+    /// |`00cN`| Scroll the screen down N lines
+    #[inline(always)]
+    fn scroll_down(&mut self, n: Nib, bus: &mut Bus) {
+        match self.flags.draw_mode {
+            true => {
+                // Get a line from the bus
+                for i in (0..16 * (64 - n as usize)).step_by(16).rev() {
+                    let i = i + self.screen as usize;
+                    let line: u128 = bus.read(i);
+                    bus.write(i - (n as usize * 16), 0u128);
+                    bus.write(i, line);
+                }
+            }
+            false => {
+                // Get a line from the bus
+                for i in (0..8 * (32 - n as usize)).step_by(8).rev() {
+                    let i = i + self.screen as usize;
+                    let line: u64 = bus.read(i);
+                    bus.write(i, 0u64);
+                    bus.write(i + (n as usize * 8), line);
+                }
+            }
+        }
+    }
+
+    /// |`00fb`| Scroll the screen right
+    #[inline(always)]
+    fn scroll_right(&mut self, bus: &mut (impl Read<u128> + Write<u128>)) {
+        // Get a line from the bus
+        for i in (0..16 * 64).step_by(16) {
+            //let line: u128 = bus.read(self.screen + i) >> 4;
+            bus.write(self.screen + i, bus.read(self.screen + i) >> 4);
+        }
+    }
+    /// |`00fc`| Scroll the screen right
+    #[inline(always)]
+    fn scroll_left(&mut self, bus: &mut (impl Read<u128> + Write<u128>)) {
+        // Get a line from the bus
+        for i in (0..16 * 64).step_by(16) {
+            let line: u128 = (bus.read(self.screen + i) & !(0xf << 124)) << 4;
+            bus.write(self.screen + i, line);
+        }
+    }
+
+    /// |`Dxyn`|
+    /// Super-Chip extension high-resolution graphics mode
+    #[inline(always)]
+    fn draw_hires(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut Bus) {
+        if !self.flags.quirks.draw_wait {
+            self.flags.draw_wait = true;
+        }
+        let (w, h) = match self.flags.draw_mode {
+            true => (128, 64),
+            false => (64, 32),
+        };
+        let (x, y) = (self.v[x] as u16 % w, self.v[y] as u16 % h);
+        match n {
+            0 => self.draw_schip_sprite(x, y, w, bus),
+            _ => self.draw_sprite(x, y, n, w, h, bus),
+        }
+    }
+    /// Draws a 16x16 Super Chip sprite
+    #[inline(always)]
+    fn draw_schip_sprite(&mut self, x: u16, y: u16, w: u16, bus: &mut Bus) {
+        self.v[0xf] = 0;
+        let w_bytes = w / 8;
+        if let Some(sprite) = bus.get(self.i as usize..(self.i + 32) as usize) {
+            let sprite = sprite.to_owned();
+            for (line, sprite) in sprite.chunks(2).enumerate() {
+                let sprite = u16::from_be_bytes(
+                    sprite
+                        .try_into()
+                        .expect("Chunks should only return 2 bytes"),
+                );
+                let addr = (y + line as u16) * w_bytes + x / 8 + self.screen;
+                let sprite = (sprite as u32) << (16 - (x % 8));
+                let screen: u32 = bus.read(addr);
+                bus.write(addr, screen ^ sprite);
+                if screen & sprite != 0 {
+                    self.v[0xf] += 1;
+                }
+            }
+        }
+    }
 
     /// |`Fx30`| (Super-Chip) 16x16 equivalent of Fx29
+    ///
+    /// TODO: Actually make and import the 16x font
     #[inline(always)]
     fn load_big_sprite(&mut self, x: Reg) {
         self.i = self.font + (5 * 8) + (16 * (self.v[x] as Adr % 0x10));
@@ -1344,5 +1349,20 @@ impl CPU {
         for (reg, value) in bus.get(0..=x).unwrap_or_default().iter().enumerate() {
             self.v[reg] = *value;
         }
+    }
+
+    /// Initialize lores mode
+    fn init_lores(&mut self, bus: &mut Bus) {
+        self.flags.draw_mode = false;
+        let scraddr = self.screen as usize;
+        bus.set_region(Region::Screen, scraddr..scraddr + 256);
+        self.clear_screen(bus);
+    }
+    /// Initialize hires mode
+    fn init_hires(&mut self, bus: &mut Bus) {
+        self.flags.draw_mode = true;
+        let scraddr = self.screen as usize;
+        bus.set_region(Region::Screen, scraddr..scraddr + 1024);
+        self.clear_screen(bus);
     }
 }

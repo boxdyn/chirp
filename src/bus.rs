@@ -166,6 +166,23 @@ impl Bus {
         }
         self
     }
+    /// Updates an existing named range (Region)
+    /// # Examples
+    /// ```rust
+    ///# use chirp::*;
+    ///# fn main() -> Result<()> {
+    ///     let bus = Bus::new().add_region(Program, 0..1234);
+    ///     assert_eq!(1234, bus.len());
+    ///#    Ok(())
+    ///# }
+    /// ```
+    pub fn set_region(&mut self, name: Region, range: Range<usize>) -> &mut Self {
+        self.with_size(range.end);
+        if let Some(region) = self.region.get_mut(name as usize) {
+            *region = Some(range);
+        }
+        self
+    }
     /// Loads data into a named region
     /// # Examples
     /// ```rust
