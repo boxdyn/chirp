@@ -43,32 +43,32 @@ struct Arguments {
     )]
     pub mode: Option<Mode>,
 
-    // #[options(
-    //     short = "z",
-    //     help = "Disable setting vF to 0 after a bitwise operation."
-    // )]
-    // pub vfreset: bool,
-    // #[options(
-    //     short = "x",
-    //     help = "Disable waiting for vblank after issuing a draw call."
-    // )]
-    // pub drawsync: bool,
+    #[options(
+        short = "z",
+        help = "Disable setting vF to 0 after a bitwise operation."
+    )]
+    pub vfreset: bool,
+    #[options(
+        short = "x",
+        help = "Disable waiting for vblank after issuing a draw call."
+    )]
+    pub drawsync: bool,
 
-    // #[options(
-    //     short = "c",
-    //     help = "Use CHIP-48 style DMA instructions, which don't touch I."
-    // )]
-    // pub memory: bool,
-    // #[options(
-    //     short = "v",
-    //     help = "Use CHIP-48 style bit-shifts, which don't touch vY."
-    // )]
-    // pub shift: bool,
-    // #[options(
-    //     short = "b",
-    //     help = "Use SUPER-CHIP style indexed jump, which is indexed relative to v[adr]."
-    // )]
-    // pub jumping: bool,
+    #[options(
+        short = "c",
+        help = "Use CHIP-48 style DMA instructions, which don't touch I."
+    )]
+    pub memory: bool,
+    #[options(
+        short = "v",
+        help = "Use CHIP-48 style bit-shifts, which don't touch vY."
+    )]
+    pub shift: bool,
+    #[options(
+        short = "b",
+        help = "Use SUPER-CHIP style indexed jump, which is indexed relative to v[adr]."
+    )]
+    pub jumping: bool,
     #[options(
         long = "break",
         help = "Set breakpoints for the emulator to stop at.",
@@ -111,7 +111,7 @@ impl State {
                     // Load the ROM file into RAM
                     Program [0x0200..0x1000] = &read(&options.file)?,
                     // Create a screen
-                    Screen  [0x1000..0x1400],
+                    Screen  [0x1000..0x1100],
                     // Create a stack
                     Stack   [0x0EA0..0x0F00],
                 },
@@ -134,6 +134,12 @@ impl State {
             ui: UIBuilder::new(128, 64, &options.file).build()?,
             ft: Instant::now(),
         };
+        // Flip the state of the quirks
+        state.ch8.cpu.flags.quirks.bin_ops ^= options.vfreset;
+        state.ch8.cpu.flags.quirks.dma_inc ^= options.memory;
+        state.ch8.cpu.flags.quirks.draw_wait ^= options.drawsync;
+        state.ch8.cpu.flags.quirks.shift ^= options.shift;
+        state.ch8.cpu.flags.quirks.stupid_jumps ^= options.jumping;
         state.ch8.bus.write(0x1feu16, options.data);
         Ok(state)
     }
@@ -154,9 +160,10 @@ impl State {
                         let time = time.elapsed();
                         let nspt = time.as_secs_f64() / ticks as f64;
                         eprintln!(
-                            "{ticks},\t{time:.05?},\t{:.4}nspt,\t{}ipf",
+                            "{ticks},\t{time:.05?},\t{:.4} nspt,\t{} ipf,\t{} mips",
                             nspt * 1_000_000_000.0,
                             ((1.0 / 60.0f64) / nspt).trunc(),
+                            (1.0 / nspt).trunc() / 1_000_000.0,
                         );
                     }
                 }
