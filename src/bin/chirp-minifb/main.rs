@@ -36,33 +36,39 @@ struct Arguments {
     pub step: Option<usize>,
     #[options(help = "Enable performance benchmarking on stderr (requires -S)")]
     pub perf: bool,
-    #[options(
-        short = "z",
-        help = "Disable setting vF to 0 after a bitwise operation."
-    )]
-    pub vfreset: bool,
-    #[options(
-        short = "x",
-        help = "Disable waiting for vblank after issuing a draw call."
-    )]
-    pub drawsync: bool,
 
     #[options(
-        short = "c",
-        help = "Use CHIP-48 style DMA instructions, which don't touch I."
+        help = "Run in (Chip8, SChip, XOChip) mode.",
+        //parse(from_str = "parse_mode")
     )]
-    pub memory: bool,
-    #[options(
-        short = "v",
-        help = "Use CHIP-48 style bit-shifts, which don't touch vY."
-    )]
-    pub shift: bool,
-    #[options(
-        short = "b",
-        help = "Use SUPER-CHIP style indexed jump, which is indexed relative to v[adr]."
-    )]
-    pub jumping: bool,
+    pub mode: Option<Mode>,
 
+    // #[options(
+    //     short = "z",
+    //     help = "Disable setting vF to 0 after a bitwise operation."
+    // )]
+    // pub vfreset: bool,
+    // #[options(
+    //     short = "x",
+    //     help = "Disable waiting for vblank after issuing a draw call."
+    // )]
+    // pub drawsync: bool,
+
+    // #[options(
+    //     short = "c",
+    //     help = "Use CHIP-48 style DMA instructions, which don't touch I."
+    // )]
+    // pub memory: bool,
+    // #[options(
+    //     short = "v",
+    //     help = "Use CHIP-48 style bit-shifts, which don't touch vY."
+    // )]
+    // pub shift: bool,
+    // #[options(
+    //     short = "b",
+    //     help = "Use SUPER-CHIP style indexed jump, which is indexed relative to v[adr]."
+    // )]
+    // pub jumping: bool,
     #[options(
         long = "break",
         help = "Set breakpoints for the emulator to stop at.",
@@ -105,7 +111,7 @@ impl State {
                     // Load the ROM file into RAM
                     Program [0x0200..0x1000] = &read(&options.file)?,
                     // Create a screen
-                    Screen  [0x1000..0x1100],
+                    Screen  [0x1000..0x1400],
                     // Create a stack
                     Stack   [0x0EA0..0x0F00],
                 },
@@ -117,13 +123,7 @@ impl State {
                     Dis::default(),
                     options.breakpoints,
                     ControlFlags {
-                        quirks: chirp::cpu::Quirks {
-                            bin_ops: options.vfreset,
-                            shift: options.shift,
-                            draw_wait: options.drawsync,
-                            dma_inc: options.memory,
-                            stupid_jumps: options.jumping,
-                        },
+                        quirks: options.mode.unwrap_or_default().into(),
                         debug: options.debug,
                         pause: options.pause,
                         monotonic: options.speed,
@@ -131,7 +131,7 @@ impl State {
                     },
                 ),
             },
-            ui: UIBuilder::new(64, 32, &options.file).build()?,
+            ui: UIBuilder::new(128, 64, &options.file).build()?,
             ft: Instant::now(),
         };
         state.ch8.bus.write(0x1feu16, options.data);
@@ -202,7 +202,7 @@ impl Iterator for State {
     }
 }
 
-fn main() -> Result<()> {
+pub fn main() -> Result<()> {
     let options = Arguments::parse_args_default_or_exit();
     let state = State::new(options)?;
     for result in state {

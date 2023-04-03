@@ -308,14 +308,14 @@ impl Bus {
         const REGION: Region = Region::Screen;
         if let Some(screen) = self.get_region(REGION) {
             for (index, byte) in screen.iter().enumerate() {
-                if index % 8 == 0 {
-                    print!("|");
+                if index % 16 == 0 {
+                    print!("{index:03x}|");
                 }
                 print!(
                     "{}",
-                    format!("{byte:08b}").replace('0', "  ").replace('1', "██")
+                    format!("{byte:08b}").replace('0', " ").replace('1', "█")
                 );
-                if index % 8 == 7 {
+                if index % 16 == 15 {
                     println!("|");
                 }
             }
@@ -339,7 +339,43 @@ impl Read<u16> for Bus {
     fn read(&self, addr: impl Into<usize>) -> u16 {
         let addr: usize = addr.into();
         if let Some(bytes) = self.memory.get(addr..addr + 2) {
-            u16::from_be_bytes(bytes.try_into().expect("asked for 2 bytes, got != 2 bytes"))
+            u16::from_be_bytes(bytes.try_into().expect("Should get 2 bytes"))
+        } else {
+            0xc5c5
+        }
+    }
+}
+
+impl Read<u32> for Bus {
+    /// Read a u16 from address `addr`
+    fn read(&self, addr: impl Into<usize>) -> u32 {
+        let addr: usize = addr.into();
+        if let Some(bytes) = self.memory.get(addr..addr + 4) {
+            u32::from_be_bytes(bytes.try_into().expect("Should get 4 bytes"))
+        } else {
+            0xc5c5
+        }
+    }
+}
+
+impl Read<u64> for Bus {
+    /// Read a u16 from address `addr`
+    fn read(&self, addr: impl Into<usize>) -> u64 {
+        let addr: usize = addr.into();
+        if let Some(bytes) = self.memory.get(addr..addr + 8) {
+            u64::from_be_bytes(bytes.try_into().expect("Should get 8 bytes"))
+        } else {
+            0xc5c5
+        }
+    }
+}
+
+impl Read<u128> for Bus {
+    /// Read a u16 from address `addr`
+    fn read(&self, addr: impl Into<usize>) -> u128 {
+        let addr: usize = addr.into();
+        if let Some(bytes) = self.memory.get(addr..addr + 16) {
+            u128::from_be_bytes(bytes.try_into().expect("Should get 16 bytes"))
         } else {
             0xc5c5
         }
@@ -361,6 +397,36 @@ impl Write<u16> for Bus {
     fn write(&mut self, addr: impl Into<usize>, data: u16) {
         let addr: usize = addr.into();
         if let Some(slice) = self.get_mut(addr..addr + 2) {
+            data.to_be_bytes().as_mut().swap_with_slice(slice);
+        }
+    }
+}
+
+impl Write<u32> for Bus {
+    /// Write a u16 to address `addr`
+    fn write(&mut self, addr: impl Into<usize>, data: u32) {
+        let addr: usize = addr.into();
+        if let Some(slice) = self.get_mut(addr..addr + 4) {
+            data.to_be_bytes().as_mut().swap_with_slice(slice);
+        }
+    }
+}
+
+impl Write<u64> for Bus {
+    /// Write a u16 to address `addr`
+    fn write(&mut self, addr: impl Into<usize>, data: u64) {
+        let addr: usize = addr.into();
+        if let Some(slice) = self.get_mut(addr..addr + 8) {
+            data.to_be_bytes().as_mut().swap_with_slice(slice);
+        }
+    }
+}
+
+impl Write<u128> for Bus {
+    /// Write a u16 to address `addr`
+    fn write(&mut self, addr: impl Into<usize>, data: u128) {
+        let addr: usize = addr.into();
+        if let Some(slice) = self.get_mut(addr..addr + 16) {
             data.to_be_bytes().as_mut().swap_with_slice(slice);
         }
     }

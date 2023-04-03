@@ -132,8 +132,8 @@ mod cpu {
                 keypause: false,
                 draw_wait: false,
                 lastkey: None,
-                quirks: Default::default(),
                 monotonic: None,
+                ..Default::default()
             };
             let cf2 = cf1.clone();
             assert_eq!(cf1, cf2)
@@ -151,9 +151,7 @@ mod cpu {
                     pause: false,
                     keypause: false,
                     draw_wait: false,
-                    lastkey: Default::default(),
-                    quirks: Default::default(),
-                    monotonic: Default::default()
+                    ..Default::default()
                 }
             )
         }
@@ -165,9 +163,7 @@ mod cpu {
                 pause: true,
                 keypause: true,
                 draw_wait: true,
-                lastkey: Default::default(),
-                quirks: Default::default(),
-                monotonic: Default::default(),
+                ..Default::default()
             };
             assert_ne!(cf1, cf2);
         }
@@ -179,9 +175,7 @@ mod cpu {
                 pause: true,
                 keypause: true,
                 draw_wait: true,
-                lastkey: Default::default(),
-                quirks: Default::default(),
-                monotonic: Default::default(),
+                ..Default::default()
             };
             assert!(cf1 < cf2);
             assert_eq!(ControlFlags::default(), cf1.min(cf2));

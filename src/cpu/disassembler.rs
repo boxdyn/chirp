@@ -9,6 +9,7 @@ use std::fmt::Display;
 #[derive(Clone, Copy, Debug, InstructionSet, PartialEq, Eq)]
 /// Implements a Disassembler using imperative_rs
 pub enum Insn {
+    // Base instruction set
     /// | 00e0 | Clear screen memory to 0s
     #[opcode = "0x00e0"]
     cls,
@@ -111,12 +112,42 @@ pub enum Insn {
     // | fX65 | DMA Load from I to registers 0..X
     #[opcode = "0xfx65"]
     dmai { x: usize },
+
+    // Super Chip extensions
+    /// | 00cN | Scroll the screen down
+    #[opcode = "0x00cn"]
+    scd { n: u8 },
+    /// | 00fb | Scroll the screen right
+    #[opcode = "0x00fb"]
+    scr,
+    /// | 00fc | Scroll the screen left
+    #[opcode = "0x00fc"]
+    scl,
+    /// | 00fd | Exit (halt and catch fire)
+    #[opcode = "0x00fd"]
+    halt,
+    /// | 00fe | Return to low-resolution mode
+    #[opcode = "0x00fe"]
+    lores,
+    /// | 00ff | Enter high-resolution mode
+    #[opcode = "0x00ff"]
+    hires,
+    /// | fx30 | Enter high-resolution mode
+    #[opcode = "0xfx30"]
+    hfont { x: usize },
+    /// | fx75 | Save to "flag registers"
+    #[opcode = "0xfx75"]
+    flgo { x: usize },
+    /// | fx85 | Load from "flag registers"
+    #[opcode = "0xfx85"]
+    flgi { x: usize },
 }
 
 impl Display for Insn {
     #[rustfmt::skip]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            // Base instruction set
             Insn::cls              => write!(f, "cls    "),
             Insn::ret              => write!(f, "ret    "),
             Insn::jmp { A }        => write!(f, "jmp    {A:03x}"),
@@ -151,6 +182,16 @@ impl Display for Insn {
             Insn::bcd { x }        => write!(f, "bcd    v{x:X}, &I"),
             Insn::dmao { x }       => write!(f, "dmao   v{x:X}"),
             Insn::dmai { x }       => write!(f, "dmai   v{x:X}"),
+            // Super Chip extensions
+            Insn::scd { n }        => write!(f, "scd    #{n:x}"),
+            Insn::scr              => write!(f, "scr    "),
+            Insn::scl              => write!(f, "scl    "),
+            Insn::halt             => write!(f, "halt   "),
+            Insn::lores            => write!(f, "lores  "),
+            Insn::hires            => write!(f, "hires  "),
+            Insn::hfont { x }      => write!(f, "hfont  v{x:X}"),
+            Insn::flgo { x }       => write!(f, "flgo   v{x:X}"),
+            Insn::flgi { x }       => write!(f, "flgi   v{x:X}"),
         }
     }
 }

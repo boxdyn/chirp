@@ -22,11 +22,38 @@ use crate::{
 use imperative_rs::InstructionSet;
 use owo_colors::OwoColorize;
 use rand::random;
-use std::time::Instant;
+use std::{str::FromStr, time::Instant};
 
 type Reg = usize;
 type Adr = u16;
 type Nib = u8;
+
+/// Selects the memory behavior of the interpreter
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Mode {
+    /// VIP emulation mode
+    #[default]
+    Chip8,
+    /// Chip-48 emulation mode
+    SChip,
+    /// XO-Chip emulation mode
+    XOChip,
+}
+
+impl FromStr for Mode {
+    type Err = Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "chip8" | "chip-8" => Ok(Mode::Chip8),
+            "schip" | "superchip" => Ok(Mode::SChip),
+            "xo-chip" | "xochip" => Ok(Mode::XOChip),
+            _ => Err(Error::InvalidMode {
+                mode: s.to_string(),
+            }),
+        }
+    }
+}
 
 /// Controls the authenticity behavior of the CPU on a granular level.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -51,7 +78,7 @@ impl From<bool> for Quirks {
                 shift: true,
                 draw_wait: true,
                 dma_inc: true,
-                stupid_jumps: false,
+                stupid_jumps: true,
             }
         } else {
             Quirks {
@@ -61,6 +88,22 @@ impl From<bool> for Quirks {
                 dma_inc: false,
                 stupid_jumps: false,
             }
+        }
+    }
+}
+
+impl From<Mode> for Quirks {
+    fn from(value: Mode) -> Self {
+        match value {
+            Mode::Chip8 => false.into(),
+            Mode::SChip => true.into(),
+            Mode::XOChip => Self {
+                bin_ops: true,
+                shift: false,
+                draw_wait: true,
+                dma_inc: false,
+                stupid_jumps: false,
+            },
         }
     }
 }
@@ -82,9 +125,13 @@ pub struct ControlFlags {
     pub keypause: bool,
     /// Set when the emulator is waiting for a frame to be drawn
     pub draw_wait: bool,
+    /// Set when the emulator is in high-res mode
+    pub draw_mode: bool,
     /// Set to the last key that's been *released* after a keypause
     pub lastkey: Option<usize>,
-    /// Represents the set of emulator [Quirks] to enable
+    /// Represents the current emulator [Mode]
+    pub mode: Mode,
+    /// Represents the set of emulator [Quirks] to enable, independent of the [Mode]
     pub quirks: Quirks,
     /// Represents the number of instructions to run per tick of the internal timer
     pub monotonic: Option<usize>,
@@ -704,6 +751,7 @@ impl CPU {
     #[rustfmt::skip]
     fn execute(&mut self, bus: &mut Bus, instruction: Insn) {
         match instruction {
+            // Core Chip-8 instructions
             Insn::cls               => self.clear_screen(bus),
             Insn::ret               => self.ret(bus),
             Insn::jmp   { A       } => self.jump(A),
@@ -713,7 +761,7 @@ impl CPU {
             Insn::se    { y, x    } => self.skip_equals(x, y),
             Insn::movb  { B, x    } => self.load_immediate(x, B),
             Insn::addb  { B, x    } => self.add_immediate(x, B),
-            Insn::mov   { x, y    } => self.load(x, y),
+            Insn::mov   { y, x    } => self.load(x, y),
             Insn::or    { y, x    } => self.or(x, y),
             Insn::and   { y, x    } => self.and(x, y),
             Insn::xor   { y, x    } => self.xor(x, y),
@@ -726,7 +774,7 @@ impl CPU {
             Insn::movI  { A       } => self.load_i_immediate(A),
             Insn::jmpr  { A       } => self.jump_indexed(A),
             Insn::rand  { B, x    } => self.rand(x, B),
-            Insn::draw  { x, y, n } => self.draw(x, y, n, bus),
+            Insn::draw  { y, x, n } => self.draw(x, y, n, bus),
             Insn::sek   { x       } => self.skip_key_equals(x),
             Insn::snek  { x       } => self.skip_key_not_equals(x),
             Insn::getdt { x       } => self.load_delay_timer(x),
@@ -738,6 +786,16 @@ impl CPU {
             Insn::bcd   { x       } => self.bcd_convert(x, bus),
             Insn::dmao  { x       } => self.store_dma(x, bus),
             Insn::dmai  { x       } => self.load_dma(x, bus),
+            // Super-Chip extensions
+            Insn::scd   {       n } => self.scroll_down(n, bus),
+            Insn::scr               => self.scr(bus),
+            Insn::scl               => self.scl(bus),
+            Insn::halt              => self.flags.pause(),
+            Insn::lores             => self.flags.draw_mode = false,
+            Insn::hires             => self.flags.draw_mode = true,
+            Insn::hfont { x       } => self.load_big_sprite(x),
+            Insn::flgo  { x       } => self.store_flags(x, bus),
+            Insn::flgi  { x       } => self.load_flags(x, bus),
         }
     }
 }
@@ -755,15 +813,44 @@ impl CPU {
     /// |`00e0`| Clears the screen memory to 0
     #[inline(always)]
     fn clear_screen(&mut self, bus: &mut Bus) {
-        if let Some(screen) = bus.get_region_mut(Region::Screen) {
-            screen.fill(0);
-        }
+        bus.clear_region(Region::Screen);
     }
     /// |`00ee`| Returns from subroutine
     #[inline(always)]
     fn ret(&mut self, bus: &impl Read<u16>) {
         self.sp = self.sp.wrapping_add(2);
         self.pc = bus.read(self.sp);
+    }
+
+    /// |`00cN`| Scroll the screen down N lines
+    #[inline(always)]
+    fn scroll_down(&mut self, n: Nib, bus: &mut Bus) {
+        // Get a line from the bus
+        for i in (16 * n as usize..16 * 15).step_by(16).rev() {
+            let i = i + self.screen as usize;
+            let line: u128 = bus.read(i);
+            bus.write(i - (n as usize * 16), line);
+            bus.write(i, 0u128);
+        }
+    }
+
+    /// |`00fb`| Scroll the screen right
+    #[inline(always)]
+    fn scr(&mut self, bus: &mut (impl Read<u128> + Write<u128>)) {
+        // Get a line from the bus
+        for i in (0..16 * 64).step_by(16) {
+            //let line: u128 = bus.read(self.screen + i) >> 4;
+            bus.write(self.screen + i, bus.read(self.screen + i) >> 4);
+        }
+    }
+    /// |`00fc`| Scroll the screen right
+    #[inline(always)]
+    fn scl(&mut self, bus: &mut (impl Read<u128> + Write<u128>)) {
+        // Get a line from the bus
+        for i in (0..16 * 64).step_by(16) {
+            let line: u128 = (bus.read(self.screen + i) & !(0xf << 124)) << 4;
+            bus.write(self.screen + i, line);
+        }
     }
 }
 
@@ -994,6 +1081,15 @@ impl CPU {
     }
 }
 
+/// TODO: Do this more idiomatically, using some iterator chain?
+fn doublewide(value: u16) -> u32 {
+    let mut out: u32 = 0;
+    for i in 0..16 {
+        out |= ((value as u32 & 0x1 << i) * 3) << i;
+    }
+    out
+}
+
 // |`Dxyn`| Draws n-byte sprite to the screen at coordinates (vX, vY)
 impl CPU {
     /// |`Dxyn`| Draws n-byte sprite to the screen at coordinates (vX, vY)
@@ -1002,31 +1098,86 @@ impl CPU {
     /// On the original chip-8 interpreter, this will wait for a VBI
     #[inline(always)]
     fn draw(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut Bus) {
-        let (x, y) = (self.v[x] as u16 % 64, self.v[y] as u16 % 32);
+        // lmaotch
+        match self.flags.draw_mode {
+            true => self.draw_hires(x, y, n, bus),
+            false => self.draw_lores(x, y, n, bus),
+        }
+    }
+    #[inline(always)]
+    fn draw_lores(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut Bus) {
         if !self.flags.quirks.draw_wait {
             self.flags.draw_wait = true;
         }
+        let (w, h) = (64, 32);
+        let (x, y) = (self.v[x] as u16 % w, self.v[y] as u16 % h);
         self.v[0xf] = 0;
-        for byte in 0..n as u16 {
-            if y + byte > 32 {
-                return;
+        if let Some(sprite) = bus.get(self.i as usize..(self.i + n as u16) as usize) {
+            let sprite = sprite.to_vec();
+            for (line, sprite) in sprite.iter().enumerate() {
+                let (line, sprite) = (line as u16, *sprite);
+                // clip
+                if y + line >= h {
+                    break;
+                }
+                // clip
+                let sprite = (sprite as u16) << (8 - (x % 8))
+                    & if (x % w) >= (w - 8) { 0xff00 } else { 0xffff };
+                // scale
+                let addr = |x, y| -> u16 { ((y + (2 * line)) * 8 + (x / 8)) * 2 + self.screen };
+                let y = y << 1;
+                let sprite = doublewide(sprite);
+                for scale in 0..2 {
+                    let screen: u32 = bus.read(addr(x, y + scale));
+                    bus.write(addr(x, y + scale), screen ^ sprite);
+                    if screen & sprite != 0 {
+                        self.v[0xf] = 1;
+                    }
+                }
             }
-            // Calculate the lower bound address based on the X,Y position on the screen
-            let addr = (y + byte) * 8 + (x & 0x3f) / 8 + self.screen;
-            // Read a byte of sprite data into a u16, and shift it x % 8 bits
-            let sprite: u8 = bus.read(self.i + byte);
-            let sprite =
-                (sprite as u16) << (8 - (x & 7)) & if x % 64 > 56 { 0xff00 } else { 0xffff };
-            // Read a u16 from the bus containing the two bytes which might need to be updated
-            let mut screen: u16 = bus.read(addr);
-            // Save the bits-toggled-off flag if necessary
-            if screen & sprite != 0 {
-                self.v[0xF] = 1
+        }
+    }
+    // Super-Chip extension high-resolution graphics mode
+    #[inline(always)]
+    fn draw_hires(&mut self, x: Reg, y: Reg, n: Nib, bus: &mut Bus) {
+        if !self.flags.quirks.draw_wait {
+            self.flags.draw_wait = true;
+        }
+        let (w, h) = (128, 64);
+        let (x, y) = (self.v[x] as u16 % w, self.v[y] as u16 % h);
+        let w_bytes = w / 8;
+        self.v[0xf] = 0;
+        if n == 0 {
+            if let Some(sprite) = bus.get(self.i as usize..(self.i + 32) as usize) {
+                let sprite = sprite.to_owned();
+                for (line, sprite) in sprite.chunks(2).enumerate() {
+                    let sprite = u16::from_be_bytes(
+                        sprite
+                            .try_into()
+                            .expect("Chunks should only return 2 bytes"),
+                    );
+                    let addr = (y + line as u16) * w_bytes + x / 8 + self.screen;
+                    let sprite = (sprite as u32) << (16 - (x % 8));
+                    let screen: u32 = bus.read(addr);
+                    bus.write(addr, screen ^ sprite);
+                    if screen & sprite != 0 {
+                        self.v[0xf] += 1;
+                    }
+                }
             }
-            // Update the screen word by XORing the sprite byte
-            screen ^= sprite;
-            // Save the result to the screen
-            bus.write(addr, screen);
+        } else {
+            if let Some(sprite) = bus.get(self.i as usize..(self.i + n as u16) as usize) {
+                let sprite = sprite.to_vec();
+                for (line, sprite) in sprite.iter().enumerate() {
+                    let addr = (y + line as u16) * w_bytes + x / 8 + self.screen;
+                    let sprite = (*sprite as u16) << (8 - (x % 8));
+                    let screen: u16 = bus.read(addr);
+                    bus.write(addr, screen ^ sprite);
+                    if screen & sprite != 0 {
+                        self.v[0xf] += 1;
+                    }
+                }
+            }
         }
     }
 }
@@ -1162,6 +1313,36 @@ impl CPU {
         }
         if !self.flags.quirks.dma_inc {
             self.i += x as Adr + 1;
+        }
+    }
+
+    /// |`Fx30`| (Super-Chip) 16x16 equivalent of Fx29
+    #[inline(always)]
+    fn load_big_sprite(&mut self, x: Reg) {
+        self.i = self.font + (5 * 8) + (16 * (self.v[x] as Adr % 0x10));
+    }
+
+    /// |`Fx75`| (Super-Chip) Save to "flag registers"
+    /// I just chuck it in 0x0..0xf. Screw it.
+    #[inline(always)]
+    fn store_flags(&mut self, x: Reg, bus: &mut Bus) {
+        // TODO: Save these, maybe
+        for (reg, value) in bus
+            .get_mut(0..=x)
+            .unwrap_or_default()
+            .iter_mut()
+            .enumerate()
+        {
+            *value = self.v[reg]
+        }
+    }
+
+    /// |`Fx85`| (Super-Chip) Load from "flag registers"
+    /// I just chuck it in 0x0..0xf. Screw it.
+    #[inline(always)]
+    fn load_flags(&mut self, x: Reg, bus: &mut Bus) {
+        for (reg, value) in bus.get(0..=x).unwrap_or_default().iter().enumerate() {
+            self.v[reg] = *value;
         }
     }
 }

@@ -52,6 +52,12 @@ pub enum Error {
         /// The offending register
         reg: usize,
     },
+    /// Tried to convert string into mode, but it did not match.
+    #[error("Invalid mode: {mode}")]
+    InvalidMode {
+        /// The string which failed to become a mode
+        mode: String,
+    },
     /// Error originated in [std::io]
     #[error(transparent)]
     IoError(#[from] std::io::Error),

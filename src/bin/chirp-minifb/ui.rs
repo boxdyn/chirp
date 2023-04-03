@@ -56,14 +56,14 @@ impl UIBuilder {
 impl Default for UIBuilder {
     fn default() -> Self {
         UIBuilder {
-            width: 64,
-            height: 32,
+            width: 128,
+            height: 64,
             name: Some("Chip-8 Interpreter"),
             rom: None,
             window_options: WindowOptions {
                 title: true,
                 resize: false,
-                scale: Scale::X16,
+                scale: Scale::X8,
                 scale_mode: ScaleMode::AspectRatioStretch,
                 none: true,
                 ..Default::default()
@@ -80,9 +80,13 @@ pub struct FrameBufferFormat {
 
 impl Default for FrameBufferFormat {
     fn default() -> Self {
+        // FrameBufferFormat {
+        //     fg: 0x0011a434,
+        //     bg: 0x001E2431,
+        // }
         FrameBufferFormat {
-            fg: 0x0011a434,
-            bg: 0x001E2431,
+            fg: 0xc4c4c4,
+            bg: 0x000000,
         }
     }
 }
@@ -112,6 +116,8 @@ impl FrameBuffer {
                         self.format.fg
                     } else {
                         self.format.bg
+                        // .wrapping_add(0x001104 * (idx / self.width) as u32)
+                        // .wrapping_add(0x141000 * (idx & 3) as u32)
                     }
                 }
             }
@@ -123,7 +129,7 @@ impl FrameBuffer {
 
 impl Default for FrameBuffer {
     fn default() -> Self {
-        Self::new(64, 32)
+        Self::new(128, 64)
     }
 }
 
