@@ -80,13 +80,9 @@ pub struct FrameBufferFormat {
 
 impl Default for FrameBufferFormat {
     fn default() -> Self {
-        // FrameBufferFormat {
-        //     fg: 0x0011a434,
-        //     bg: 0x001E2431,
-        // }
         FrameBufferFormat {
-            fg: 0xc4c4c4,
-            bg: 0x000000,
+            fg: 0x0011a434,
+            bg: 0x001E2431,
         }
     }
 }
@@ -110,6 +106,21 @@ impl FrameBuffer {
     }
     pub fn render(&mut self, window: &mut Window, bus: &Bus) -> Result<()> {
         if let Some(screen) = bus.get_region(Region::Screen) {
+            // Resizing the buffer does not unmap memory.
+            // After the first use of high-res mode, this is pretty cheap
+            (self.width, self.height) = match screen.len() {
+                256 => {
+                    self.buffer.resize(64 * 32, 0);
+                    (64, 32)
+                }
+                1024 => {
+                    self.buffer.resize(128 * 64, 0);
+                    (128, 64)
+                }
+                _ => {
+                    unimplemented!("Screen must be 64*32 or 128*64");
+                }
+            };
             for (idx, byte) in screen.iter().enumerate() {
                 for bit in 0..8 {
                     self.buffer[8 * idx + bit] = if byte & (1 << (7 - bit)) as u8 != 0 {
@@ -129,7 +140,7 @@ impl FrameBuffer {
 
 impl Default for FrameBuffer {
     fn default() -> Self {
-        Self::new(128, 64)
+        Self::new(64, 32)
     }
 }
 
