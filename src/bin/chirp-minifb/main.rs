@@ -19,6 +19,23 @@ use std::{
 };
 use ui::*;
 
+pub fn main() -> Result<()> {
+    let options = Arguments::parse_args_default_or_exit();
+    let state = State::new(options)?;
+    for result in state {
+        if let Err(e) = result {
+            eprintln!("{}", e.bold().red());
+            break;
+        }
+    }
+    Ok(())
+}
+
+/// Parses a hexadecimal string into a u16
+fn parse_hex(value: &str) -> std::result::Result<u16, std::num::ParseIntError> {
+    u16::from_str_radix(value, 16)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Options, Hash)]
 struct Arguments {
     #[options(help = "Load a ROM to run on Chirp.", required, free)]
@@ -207,21 +224,4 @@ impl Iterator for State {
         }
         Some(Ok(()))
     }
-}
-
-pub fn main() -> Result<()> {
-    let options = Arguments::parse_args_default_or_exit();
-    let state = State::new(options)?;
-    for result in state {
-        if let Err(e) = result {
-            eprintln!("{}", e.bold().red());
-            break;
-        }
-    }
-    Ok(())
-}
-
-/// Parses a hexadecimal string into a u16
-fn parse_hex(value: &str) -> std::result::Result<u16, std::num::ParseIntError> {
-    u16::from_str_radix(value, 16)
 }
