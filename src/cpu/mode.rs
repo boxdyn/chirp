@@ -1,4 +1,7 @@
 //! Selects the memory behavior of the [super::CPU]
+//!
+//! Since [super::Quirks] implements [From<Mode>],
+//! this can be used to select the appropriate quirk-set
 
 use crate::error::Error;
 use std::str::FromStr;

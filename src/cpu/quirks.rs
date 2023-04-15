@@ -1,4 +1,4 @@
-//! Controls the authenticity behavior of the CPU on a granular level.
+//! Controls the [Quirks] behavior of the CPU on a granular level.
 use super::Mode;
 /// Controls the authenticity behavior of the CPU on a granular level.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

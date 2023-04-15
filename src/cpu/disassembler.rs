@@ -1,9 +1,14 @@
 //! A disassembler for Chip-8 opcodes
 #![allow(clippy::bad_bit_mask)]
-use super::Disassembler;
 use imperative_rs::InstructionSet;
 use owo_colors::{OwoColorize, Style};
 use std::fmt::Display;
+
+/// Disassembles Chip-8 instructions
+pub trait Disassembler {
+    /// Disassemble a single instruction
+    fn once(&self, insn: u16) -> String;
+}
 
 #[allow(non_camel_case_types, non_snake_case, missing_docs)]
 #[derive(Clone, Copy, Debug, InstructionSet, PartialEq, Eq)]

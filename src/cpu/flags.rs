@@ -1,8 +1,8 @@
-//! Represents flags that aid in implementation but aren't a part of the Chip-8 spec
+//! Represents [Flags] that aid in implementation but aren't a part of the Chip-8 spec
 
 use super::{Mode, Quirks};
 
-/// Represents flags that aid in operation, but aren't inherent to the CPU
+/// Represents flags that aid in implementation but aren't a part of the Chip-8 spec
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Flags {
     /// Set when debug (live disassembly) mode enabled
@@ -54,5 +54,10 @@ impl Flags {
     /// ```
     pub fn pause(&mut self) {
         self.pause = !self.pause
+    }
+
+    /// Gets whether the CPU is paused for any reason
+    pub fn is_paused(&self) -> bool {
+        self.pause || self.draw_wait || self.keypause
     }
 }

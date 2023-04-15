@@ -1,23 +1,7 @@
-use chirp::{cpu::Disassembler, error::Result, *};
+use chirp::{error::Result, *};
 use gumdrop::*;
 use owo_colors::OwoColorize;
 use std::{fs::read, path::PathBuf};
-
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Options, Hash)]
-struct Arguments {
-    #[options(help = "Show help text")]
-    help: bool,
-    #[options(help = "Load a ROM to run on Chirp", free, required)]
-    pub file: PathBuf,
-    #[options(help = "Load address (usually 200)", parse(try_from_str = "parse_hex"))]
-    pub loadaddr: u16,
-    #[options(help = "Start disassembling at offset...")]
-    pub offset: usize,
-}
-
-fn parse_hex(value: &str) -> std::result::Result<u16, std::num::ParseIntError> {
-    u16::from_str_radix(value, 16)
-}
 
 fn main() -> Result<()> {
     let options = Arguments::parse_args_default_or_exit();
@@ -39,4 +23,20 @@ fn main() -> Result<()> {
         );
     }
     Ok(())
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Options, Hash)]
+struct Arguments {
+    #[options(help = "Show help text")]
+    help: bool,
+    #[options(help = "Load a ROM to run on Chirp", free, required)]
+    pub file: PathBuf,
+    #[options(help = "Load address (usually 200)", parse(try_from_str = "parse_hex"))]
+    pub loadaddr: u16,
+    #[options(help = "Start disassembling at offset...")]
+    pub offset: usize,
+}
+
+fn parse_hex(value: &str) -> std::result::Result<u16, std::num::ParseIntError> {
+    u16::from_str_radix(value, 16)
 }

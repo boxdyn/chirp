@@ -64,6 +64,7 @@ pub enum Error {
     /// Error originated in [std::array::TryFromSliceError]
     #[error(transparent)]
     TryFromSliceError(#[from] std::array::TryFromSliceError),
+    #[cfg(feature = "minifb")]
     /// Error originated in [minifb]
     #[error(transparent)]
     MinifbError(#[from] minifb::Error),

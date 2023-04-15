@@ -66,6 +66,7 @@ Optional arguments:
 
 ## TODO:
 
+- [ ] Move the screen, stack, charset, and program memory into the CPU
 - [ ] Implement sound
 - [ ] Finish unit tests for "quirks"
 - [ ] Make pausing/unpausing the emulator less messy

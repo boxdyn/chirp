@@ -6,12 +6,6 @@
 #[cfg(test)]
 mod tests;
 
-/// Disassembles Chip-8 instructions
-pub trait Disassembler {
-    /// Disassemble a single instruction
-    fn once(&self, insn: u16) -> String;
-}
-
 pub mod disassembler;
 pub mod flags;
 pub mod instruction;
@@ -19,7 +13,7 @@ pub mod mode;
 pub mod quirks;
 
 use self::{
-    disassembler::{Dis, Insn},
+    disassembler::{Dis, Disassembler, Insn},
     flags::Flags,
     mode::Mode,
     quirks::Quirks,
@@ -57,7 +51,7 @@ impl Default for Timers {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CPU {
     /// Flags that control how the CPU behaves, but which aren't inherent to the
-    /// implementation. Includes [Quirks], target IPF, etc.
+    /// chip-8. Includes [Quirks], target IPF, etc.
     pub flags: Flags,
     // memory map info
     screen: Adr,
@@ -478,7 +472,7 @@ impl CPU {
     /// ```
     pub fn tick(&mut self, bus: &mut Bus) -> Result<&mut Self> {
         // Do nothing if paused
-        if self.flags.pause || self.flags.draw_wait || self.flags.keypause {
+        if self.flags.is_paused() {
             // always tick in test mode
             if self.flags.monotonic.is_some() {
                 self.cycle += 1;

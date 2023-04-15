@@ -1,7 +1,7 @@
 // (c) 2023 John A. Breaux
 // This code is licensed under MIT license (see LICENSE.txt for details)
 
-//! Contains implementations for each instruction defined in [super::disassembler]
+//! Contains implementations for each [Insn] as private member functions of [CPU]
 
 use super::*;
 
