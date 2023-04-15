@@ -139,7 +139,7 @@ impl State {
                     0xefe,
                     Dis::default(),
                     options.breakpoints,
-                    ControlFlags {
+                    Flags {
                         quirks: options.mode.unwrap_or_default().into(),
                         debug: options.debug,
                         pause: options.pause,

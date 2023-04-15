@@ -4,7 +4,7 @@ pub use chirp::*;
 
 fn setup_environment() -> (CPU, Bus) {
     let mut cpu = CPU::default();
-    cpu.flags = ControlFlags {
+    cpu.flags = Flags {
         debug: true,
         pause: false,
         monotonic: Some(8),

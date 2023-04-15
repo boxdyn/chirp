@@ -1,7 +1,7 @@
 // (c) 2023 John A. Breaux
 // This code is licensed under MIT license (see LICENSE.txt for details)
 
-//! Tests for cpu.rs
+//! Unit tests for [super::CPU]
 //!
 //! These run instructions, and ensure their output is consistent with previous builds
 //!
@@ -23,7 +23,7 @@ mod decode;
 fn setup_environment() -> (CPU, Bus) {
     (
         CPU {
-            flags: ControlFlags {
+            flags: Flags {
                 debug: true,
                 pause: false,
                 monotonic: Some(8),

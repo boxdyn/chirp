@@ -126,7 +126,7 @@ mod cpu {
         //#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
         #[test]
         fn clone() {
-            let cf1 = ControlFlags {
+            let cf1 = Flags {
                 debug: false,
                 pause: false,
                 keypause: false,
@@ -140,13 +140,13 @@ mod cpu {
         }
         #[test]
         fn debug() {
-            println!("{:?}", ControlFlags::default());
+            println!("{:?}", Flags::default());
         }
         #[test]
         fn default() {
             assert_eq!(
-                ControlFlags::default(),
-                ControlFlags {
+                Flags::default(),
+                Flags {
                     debug: false,
                     pause: false,
                     keypause: false,
@@ -157,8 +157,8 @@ mod cpu {
         }
         #[test]
         fn eq() {
-            let cf1 = ControlFlags::default();
-            let cf2 = ControlFlags {
+            let cf1 = Flags::default();
+            let cf2 = Flags {
                 debug: true,
                 pause: true,
                 keypause: true,
@@ -169,8 +169,8 @@ mod cpu {
         }
         #[test]
         fn ord() {
-            let cf1 = ControlFlags::default();
-            let cf2 = ControlFlags {
+            let cf1 = Flags::default();
+            let cf2 = Flags {
                 debug: true,
                 pause: true,
                 keypause: true,
@@ -178,12 +178,12 @@ mod cpu {
                 ..Default::default()
             };
             assert!(cf1 < cf2);
-            assert_eq!(ControlFlags::default(), cf1.min(cf2));
+            assert_eq!(Flags::default(), cf1.min(cf2));
         }
         #[test]
         fn hash() {
             let mut hasher = DefaultHasher::new();
-            ControlFlags::default().hash(&mut hasher);
+            Flags::default().hash(&mut hasher);
             println!("{:?}", hasher);
         }
     }
@@ -215,7 +215,7 @@ fn error() {
 
 mod quirks {
     use super::*;
-    use chirp::cpu::Quirks;
+    use chirp::cpu::quirks::Quirks;
 
     #[test]
     fn from_true() {
