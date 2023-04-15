@@ -126,70 +126,64 @@ mod cpu {
         //#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
         #[test]
         fn clone() {
-            let cf1 = ControlFlags {
+            let cf1 = Flags {
                 debug: false,
                 pause: false,
                 keypause: false,
                 draw_wait: false,
                 lastkey: None,
-                quirks: Default::default(),
                 monotonic: None,
+                ..Default::default()
             };
             let cf2 = cf1.clone();
             assert_eq!(cf1, cf2)
         }
         #[test]
         fn debug() {
-            println!("{:?}", ControlFlags::default());
+            println!("{:?}", Flags::default());
         }
         #[test]
         fn default() {
             assert_eq!(
-                ControlFlags::default(),
-                ControlFlags {
+                Flags::default(),
+                Flags {
                     debug: false,
                     pause: false,
                     keypause: false,
                     draw_wait: false,
-                    lastkey: Default::default(),
-                    quirks: Default::default(),
-                    monotonic: Default::default()
+                    ..Default::default()
                 }
             )
         }
         #[test]
         fn eq() {
-            let cf1 = ControlFlags::default();
-            let cf2 = ControlFlags {
+            let cf1 = Flags::default();
+            let cf2 = Flags {
                 debug: true,
                 pause: true,
                 keypause: true,
                 draw_wait: true,
-                lastkey: Default::default(),
-                quirks: Default::default(),
-                monotonic: Default::default(),
+                ..Default::default()
             };
             assert_ne!(cf1, cf2);
         }
         #[test]
         fn ord() {
-            let cf1 = ControlFlags::default();
-            let cf2 = ControlFlags {
+            let cf1 = Flags::default();
+            let cf2 = Flags {
                 debug: true,
                 pause: true,
                 keypause: true,
                 draw_wait: true,
-                lastkey: Default::default(),
-                quirks: Default::default(),
-                monotonic: Default::default(),
+                ..Default::default()
             };
             assert!(cf1 < cf2);
-            assert_eq!(ControlFlags::default(), cf1.min(cf2));
+            assert_eq!(Flags::default(), cf1.min(cf2));
         }
         #[test]
         fn hash() {
             let mut hasher = DefaultHasher::new();
-            ControlFlags::default().hash(&mut hasher);
+            Flags::default().hash(&mut hasher);
             println!("{:?}", hasher);
         }
     }
@@ -221,7 +215,7 @@ fn error() {
 
 mod quirks {
     use super::*;
-    use chirp::cpu::Quirks;
+    use chirp::cpu::quirks::Quirks;
 
     #[test]
     fn from_true() {
@@ -233,7 +227,7 @@ mod quirks {
                 shift: true,
                 draw_wait: true,
                 dma_inc: true,
-                stupid_jumps: false,
+                stupid_jumps: true,
             }
         )
     }

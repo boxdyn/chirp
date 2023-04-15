@@ -19,6 +19,23 @@ use std::{
 };
 use ui::*;
 
+pub fn main() -> Result<()> {
+    let options = Arguments::parse_args_default_or_exit();
+    let state = State::new(options)?;
+    for result in state {
+        if let Err(e) = result {
+            eprintln!("{}", e.bold().red());
+            break;
+        }
+    }
+    Ok(())
+}
+
+/// Parses a hexadecimal string into a u16
+fn parse_hex(value: &str) -> std::result::Result<u16, std::num::ParseIntError> {
+    u16::from_str_radix(value, 16)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Options, Hash)]
 struct Arguments {
     #[options(help = "Load a ROM to run on Chirp.", required, free)]
@@ -36,6 +53,13 @@ struct Arguments {
     pub step: Option<usize>,
     #[options(help = "Enable performance benchmarking on stderr (requires -S)")]
     pub perf: bool,
+
+    #[options(
+        help = "Run in (Chip8, SChip, XOChip) mode.",
+        //parse(from_str = "parse_mode")
+    )]
+    pub mode: Option<Mode>,
+
     #[options(
         short = "z",
         help = "Disable setting vF to 0 after a bitwise operation."
@@ -62,7 +86,6 @@ struct Arguments {
         help = "Use SUPER-CHIP style indexed jump, which is indexed relative to v[adr]."
     )]
     pub jumping: bool,
-
     #[options(
         long = "break",
         help = "Set breakpoints for the emulator to stop at.",
@@ -116,14 +139,8 @@ impl State {
                     0xefe,
                     Dis::default(),
                     options.breakpoints,
-                    ControlFlags {
-                        quirks: chirp::cpu::Quirks {
-                            bin_ops: options.vfreset,
-                            shift: options.shift,
-                            draw_wait: options.drawsync,
-                            dma_inc: options.memory,
-                            stupid_jumps: options.jumping,
-                        },
+                    Flags {
+                        quirks: options.mode.unwrap_or_default().into(),
                         debug: options.debug,
                         pause: options.pause,
                         monotonic: options.speed,
@@ -131,9 +148,15 @@ impl State {
                     },
                 ),
             },
-            ui: UIBuilder::new(64, 32, &options.file).build()?,
+            ui: UIBuilder::new(128, 64, &options.file).build()?,
             ft: Instant::now(),
         };
+        // Flip the state of the quirks
+        state.ch8.cpu.flags.quirks.bin_ops ^= options.vfreset;
+        state.ch8.cpu.flags.quirks.dma_inc ^= options.memory;
+        state.ch8.cpu.flags.quirks.draw_wait ^= options.drawsync;
+        state.ch8.cpu.flags.quirks.shift ^= options.shift;
+        state.ch8.cpu.flags.quirks.stupid_jumps ^= options.jumping;
         state.ch8.bus.write(0x1feu16, options.data);
         Ok(state)
     }
@@ -154,9 +177,10 @@ impl State {
                         let time = time.elapsed();
                         let nspt = time.as_secs_f64() / ticks as f64;
                         eprintln!(
-                            "{ticks},\t{time:.05?},\t{:.4}nspt,\t{}ipf",
+                            "{ticks},\t{time:.05?},\t{:.4} nspt,\t{} ipf,\t{} mips",
                             nspt * 1_000_000_000.0,
                             ((1.0 / 60.0f64) / nspt).trunc(),
+                            (1.0 / nspt).trunc() / 1_000_000.0,
                         );
                     }
                 }
@@ -200,21 +224,4 @@ impl Iterator for State {
         }
         Some(Ok(()))
     }
-}
-
-fn main() -> Result<()> {
-    let options = Arguments::parse_args_default_or_exit();
-    let state = State::new(options)?;
-    for result in state {
-        if let Err(e) = result {
-            eprintln!("{}", e.bold().red());
-            break;
-        }
-    }
-    Ok(())
-}
-
-/// Parses a hexadecimal string into a u16
-fn parse_hex(value: &str) -> std::result::Result<u16, std::num::ParseIntError> {
-    u16::from_str_radix(value, 16)
 }

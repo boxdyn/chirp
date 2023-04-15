@@ -14,8 +14,14 @@ pub mod error;
 
 // Common imports for Chirp
 pub use bus::{Bus, Read, Region::*, Write};
-pub use cpu::{disassembler::Dis, ControlFlags, CPU};
-pub use error::Result;
+pub use cpu::{
+    disassembler::{Dis, Disassembler},
+    flags::Flags,
+    mode::Mode,
+    quirks::Quirks,
+    CPU,
+};
+pub use error::{Error, Result};
 
 /// Holds the state of a Chip-8
 #[derive(Clone, Debug, Default, PartialEq)]

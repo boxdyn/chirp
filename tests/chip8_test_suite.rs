@@ -4,7 +4,7 @@ pub use chirp::*;
 
 fn setup_environment() -> (CPU, Bus) {
     let mut cpu = CPU::default();
-    cpu.flags = ControlFlags {
+    cpu.flags = Flags {
         debug: true,
         pause: false,
         monotonic: Some(8),
@@ -17,7 +17,7 @@ fn setup_environment() -> (CPU, Bus) {
             Charset [0x0050..0x00A0] = include_bytes!("../src/mem/charset.bin"),
             // Load the ROM file into RAM
             Program [0x0200..0x1000] = include_bytes!("../chip8-test-suite/bin/chip8-test-suite.ch8"),
-            // Create a screen, and fill it with garbage data
+            // Create a screen, and fill it with
             Screen  [0x0F00..0x1000] = include_bytes!("chip8_test_suite.rs"),
         },
     )

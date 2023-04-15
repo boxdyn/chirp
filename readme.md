@@ -6,8 +6,9 @@ I don't know!
 So I wrote this, to see if i can find out.
 
 ## Features:
-- 32 * 64 1bpp pixel display, scaled 16x
+- 64 * 128 1bpp pixel display, scaled 8x
 - Full coverage of the original Chip-8 insn set
+- Partial coverage of the Super Chip-8 extension set
 - 64-bit floating point internal sound/delay timers
 - Pause/Resume
 - Set and unset breakpoints
@@ -65,6 +66,7 @@ Optional arguments:
 
 ## TODO:
 
+- [ ] Move the screen, stack, charset, and program memory into the CPU
 - [ ] Implement sound
 - [ ] Finish unit tests for "quirks"
 - [ ] Make pausing/unpausing the emulator less messy

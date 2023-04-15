@@ -56,14 +56,14 @@ impl UIBuilder {
 impl Default for UIBuilder {
     fn default() -> Self {
         UIBuilder {
-            width: 64,
-            height: 32,
+            width: 128,
+            height: 64,
             name: Some("Chip-8 Interpreter"),
             rom: None,
             window_options: WindowOptions {
                 title: true,
                 resize: false,
-                scale: Scale::X16,
+                scale: Scale::X8,
                 scale_mode: ScaleMode::AspectRatioStretch,
                 none: true,
                 ..Default::default()
@@ -106,12 +106,24 @@ impl FrameBuffer {
     }
     pub fn render(&mut self, window: &mut Window, bus: &Bus) -> Result<()> {
         if let Some(screen) = bus.get_region(Region::Screen) {
+            // Resizing the buffer does not unmap memory.
+            // After the first use of high-res mode, this is pretty cheap
+            (self.width, self.height) = match screen.len() {
+                256 => (64, 32),
+                1024 => (128, 64),
+                _ => {
+                    unimplemented!("Screen must be 64*32 or 128*64");
+                }
+            };
+            self.buffer.resize(self.width * self.height, 0);
             for (idx, byte) in screen.iter().enumerate() {
                 for bit in 0..8 {
                     self.buffer[8 * idx + bit] = if byte & (1 << (7 - bit)) as u8 != 0 {
                         self.format.fg
                     } else {
                         self.format.bg
+                        // .wrapping_add(0x001104 * (idx / self.width) as u32)
+                        // .wrapping_add(0x141000 * (idx & 3) as u32)
                     }
                 }
             }

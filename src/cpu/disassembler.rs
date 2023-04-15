@@ -1,14 +1,20 @@
 //! A disassembler for Chip-8 opcodes
 #![allow(clippy::bad_bit_mask)]
-use super::Disassembler;
 use imperative_rs::InstructionSet;
 use owo_colors::{OwoColorize, Style};
 use std::fmt::Display;
+
+/// Disassembles Chip-8 instructions
+pub trait Disassembler {
+    /// Disassemble a single instruction
+    fn once(&self, insn: u16) -> String;
+}
 
 #[allow(non_camel_case_types, non_snake_case, missing_docs)]
 #[derive(Clone, Copy, Debug, InstructionSet, PartialEq, Eq)]
 /// Implements a Disassembler using imperative_rs
 pub enum Insn {
+    // Base instruction set
     /// | 00e0 | Clear screen memory to 0s
     #[opcode = "0x00e0"]
     cls,
@@ -77,7 +83,7 @@ pub enum Insn {
     rand { B: u8, x: usize },
     /// | Dxyn | Draws n-byte sprite to the screen at coordinates (vX, vY)
     #[opcode = "0xdxyn"]
-    draw { x: usize, y: usize, n: u8 },
+    draw { y: usize, x: usize, n: u8 },
     /// | eX9e | Skip next instruction if key == vX
     #[opcode = "0xex9e"]
     sek { x: usize },
@@ -111,19 +117,49 @@ pub enum Insn {
     // | fX65 | DMA Load from I to registers 0..X
     #[opcode = "0xfx65"]
     dmai { x: usize },
+
+    // Super Chip extensions
+    /// | 00cN | Scroll the screen down
+    #[opcode = "0x00cn"]
+    scd { n: u8 },
+    /// | 00fb | Scroll the screen right
+    #[opcode = "0x00fb"]
+    scr,
+    /// | 00fc | Scroll the screen left
+    #[opcode = "0x00fc"]
+    scl,
+    /// | 00fd | Exit (halt and catch fire)
+    #[opcode = "0x00fd"]
+    halt,
+    /// | 00fe | Return to low-resolution mode
+    #[opcode = "0x00fe"]
+    lores,
+    /// | 00ff | Enter high-resolution mode
+    #[opcode = "0x00ff"]
+    hires,
+    /// | fx30 | Enter high-resolution mode
+    #[opcode = "0xfx30"]
+    hfont { x: usize },
+    /// | fx75 | Save to "flag registers"
+    #[opcode = "0xfx75"]
+    flgo { x: usize },
+    /// | fx85 | Load from "flag registers"
+    #[opcode = "0xfx85"]
+    flgi { x: usize },
 }
 
 impl Display for Insn {
     #[rustfmt::skip]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            // Base instruction set
             Insn::cls              => write!(f, "cls    "),
             Insn::ret              => write!(f, "ret    "),
             Insn::jmp { A }        => write!(f, "jmp    {A:03x}"),
             Insn::call { A }       => write!(f, "call   {A:03x}"),
             Insn::seb { B, x }     => write!(f, "se     #{B:02x}, v{x:X}"),
             Insn::sneb { B, x }    => write!(f, "sne    #{B:02x}, v{x:X}"),
-            Insn::se { y, x }      => write!(f, "se     v{x:X}, v{y:X}"),
+            Insn::se { y, x }      => write!(f, "se     v{y:X}, v{x:X}"),
             Insn::movb { B, x }    => write!(f, "mov    #{B:02x}, v{x:X}"),
             Insn::addb { B, x }    => write!(f, "add    #{B:02x}, v{x:X}"),
             Insn::mov { x, y }     => write!(f, "mov    v{y:X}, v{x:X}"),
@@ -135,11 +171,11 @@ impl Display for Insn {
             Insn::shr { y, x }     => write!(f, "shr    v{y:X}, v{x:X}"),
             Insn::bsub { y, x }    => write!(f, "bsub   v{y:X}, v{x:X}"),
             Insn::shl { y, x }     => write!(f, "shl    v{y:X}, v{x:X}"),
-            Insn::sne { y, x }     => write!(f, "sne    v{x:X}, v{y:X}"),
+            Insn::sne { y, x }     => write!(f, "sne    v{y:X}, v{x:X}"),
             Insn::movI { A }       => write!(f, "mov    ${A:03x}, I"),
             Insn::jmpr { A }       => write!(f, "jmp    ${A:03x}+v0"),
             Insn::rand { B, x }    => write!(f, "rand   #{B:02x}, v{x:X}"),
-            Insn::draw { x, y, n } => write!(f, "draw   #{n:x}, v{x:X}, v{y:X}"),
+            Insn::draw { y, x, n } => write!(f, "draw   #{n:x}, v{x:X}, v{y:X}"),
             Insn::sek { x }        => write!(f, "sek    v{x:X}"),
             Insn::snek { x }       => write!(f, "snek   v{x:X}"),
             Insn::getdt { x }      => write!(f, "mov    DT, v{x:X}"),
@@ -151,6 +187,16 @@ impl Display for Insn {
             Insn::bcd { x }        => write!(f, "bcd    v{x:X}, &I"),
             Insn::dmao { x }       => write!(f, "dmao   v{x:X}"),
             Insn::dmai { x }       => write!(f, "dmai   v{x:X}"),
+            // Super Chip extensions
+            Insn::scd { n }        => write!(f, "scd    #{n:x}"),
+            Insn::scr              => write!(f, "scr    "),
+            Insn::scl              => write!(f, "scl    "),
+            Insn::halt             => write!(f, "halt   "),
+            Insn::lores            => write!(f, "lores  "),
+            Insn::hires            => write!(f, "hires  "),
+            Insn::hfont { x }      => write!(f, "hfont  v{x:X}"),
+            Insn::flgo { x }       => write!(f, "flgo   v{x:X}"),
+            Insn::flgi { x }       => write!(f, "flgi   v{x:X}"),
         }
     }
 }

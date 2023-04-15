@@ -52,12 +52,19 @@ pub enum Error {
         /// The offending register
         reg: usize,
     },
+    /// Tried to convert string into mode, but it did not match.
+    #[error("Invalid mode: {mode}")]
+    InvalidMode {
+        /// The string which failed to become a mode
+        mode: String,
+    },
     /// Error originated in [std::io]
     #[error(transparent)]
     IoError(#[from] std::io::Error),
     /// Error originated in [std::array::TryFromSliceError]
     #[error(transparent)]
     TryFromSliceError(#[from] std::array::TryFromSliceError),
+    #[cfg(feature = "minifb")]
     /// Error originated in [minifb]
     #[error(transparent)]
     MinifbError(#[from] minifb::Error),
