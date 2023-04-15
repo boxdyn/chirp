@@ -109,18 +109,13 @@ impl FrameBuffer {
             // Resizing the buffer does not unmap memory.
             // After the first use of high-res mode, this is pretty cheap
             (self.width, self.height) = match screen.len() {
-                256 => {
-                    self.buffer.resize(64 * 32, 0);
-                    (64, 32)
-                }
-                1024 => {
-                    self.buffer.resize(128 * 64, 0);
-                    (128, 64)
-                }
+                256 => (64, 32),
+                1024 => (128, 64),
                 _ => {
                     unimplemented!("Screen must be 64*32 or 128*64");
                 }
             };
+            self.buffer.resize(self.width * self.height, 0);
             for (idx, byte) in screen.iter().enumerate() {
                 for bit in 0..8 {
                     self.buffer[8 * idx + bit] = if byte & (1 << (7 - bit)) as u8 != 0 {
