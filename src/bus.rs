@@ -324,15 +324,43 @@ impl Bus {
     pub fn print_screen(&self) -> Result<()> {
         const REGION: Region = Region::Screen;
         if let Some(screen) = self.get_region(REGION) {
+            let len_log2 = screen.len().ilog2() / 2;
+            #[allow(unused_variables)]
+            let (width, height) = (2u32.pow(len_log2 - 1), 2u32.pow(len_log2));
+            // draw with the drawille library, if available
+            #[cfg(feature = "drawille")]
+            {
+                use drawille::Canvas;
+                let mut canvas = Canvas::new(width * 8, height);
+                let width = width * 8;
+                screen
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(bytei, byte)| {
+                        (0..8)
+                            .into_iter()
+                            .enumerate()
+                            .filter_map(move |(biti, bit)| {
+                                if (byte << bit) & 0x80 != 0 {
+                                    Some(bytei * 8 + biti)
+                                } else {
+                                    None
+                                }
+                            })
+                    })
+                    .for_each(|index| canvas.set(index as u32 % (width), index as u32 / (width)));
+                println!("{}", canvas.frame());
+            }
+            #[cfg(not(feature = "drawille"))]
             for (index, byte) in screen.iter().enumerate() {
-                if index % 16 == 0 {
+                if index % width as usize == 0 {
                     print!("{index:03x}|");
                 }
                 print!(
                     "{}",
                     format!("{byte:08b}").replace('0', " ").replace('1', "█")
                 );
-                if index % 16 == 15 {
+                if index % width as usize == width as usize - 1 {
                     println!("|");
                 }
             }
