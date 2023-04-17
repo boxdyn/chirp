@@ -339,16 +339,25 @@ impl CPU {
             let sprite = sprite.to_vec();
             for (line, &sprite) in sprite.iter().enumerate() {
                 let line = line as u16;
-                if y + line >= h {
-                    break;
-                }
-                let sprite = (sprite as u16) << (8 - (x % 8))
-                    & if (x % w) >= (w - 8) { 0xff00 } else { 0xffff };
-                let addr = |x, y| -> u16 { (y + line) * w_bytes + (x / 8) + self.screen };
-                let screen: u16 = bus.read(addr(x, y));
-                bus.write(addr(x, y), screen ^ sprite);
-                if screen & sprite != 0 {
-                    self.v[0xf] = 1;
+                let sprite = ((sprite as u16) << (8 - (x % 8))).to_be_bytes();
+                for (addr, &byte) in sprite.iter().enumerate().filter_map(|(idx, byte)| {
+                    let x = (x / 8) + idx as u16;
+                    Some((
+                        if self.flags.quirks.screen_wrap {
+                            ((y + line) % h * w_bytes + (x % w_bytes)) % (w_bytes * h)
+                        } else if x < w_bytes {
+                            (y + line) * w_bytes + x
+                        } else {
+                            return None;
+                        } + self.screen,
+                        byte,
+                    ))
+                }) {
+                    let screen: u8 = bus.read(addr);
+                    bus.write(addr, byte ^ screen);
+                    if byte & screen != 0 {
+                        self.v[0xf] = 1;
+                    }
                 }
             }
         }
