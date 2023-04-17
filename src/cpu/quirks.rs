@@ -11,7 +11,7 @@ pub struct Quirks {
     pub shift: bool,
     /// Super Chip: Draw operations shouldn't pause execution until the next timer tick
     pub draw_wait: bool,
-    /// XO-Chip:    Draw operations shouldn't wrap from the bottom of the screen to the top
+    /// XO-Chip:    Draw operations should wrap from bottom to top and side to side
     pub screen_wrap: bool,
     /// Super Chip: DMA instructions `Fx55`/`Fx65` shouldn't change I to I + x + 1
     pub dma_inc: bool,
