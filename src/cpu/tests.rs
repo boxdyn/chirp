@@ -106,17 +106,14 @@ mod sys {
     #[test]
     fn ret() {
         let test_addr = random::<u16>() & 0x7ff;
-        let (mut cpu, mut bus) = setup_environment();
-        let sp_orig = cpu.sp;
+        let (mut cpu, _) = setup_environment();
         // Place the address on the stack
-        bus.write(cpu.sp.wrapping_add(2), test_addr);
+        cpu.stack.push(test_addr);
 
-        cpu.ret(&bus);
+        cpu.ret();
 
         // Verify the current address is the address from the stack
         assert_eq!(test_addr, cpu.pc);
-        // Verify the stack pointer has moved
-        assert!(dbg!(cpu.sp.wrapping_sub(sp_orig)) == 0x2);
     }
 }
 
@@ -132,9 +129,9 @@ mod cf {
         let (mut cpu, _) = setup_environment();
         // Test all valid addresses
         for addr in 0x000..0xffe {
-            // Call an address
+            // Jump to an address
             cpu.jump(addr);
-            // Verify the current address is the called address
+            // Verify the current address is the jump target address
             assert_eq!(addr, cpu.pc);
         }
     }
@@ -143,15 +140,15 @@ mod cf {
     #[test]
     fn call() {
         let test_addr = random::<u16>();
-        let (mut cpu, mut bus) = setup_environment();
+        let (mut cpu, _) = setup_environment();
         // Save the current address
         let curr_addr = cpu.pc;
         // Call an address
-        cpu.call(test_addr, &mut bus);
+        cpu.call(test_addr);
         // Verify the current address is the called address
         assert_eq!(test_addr, cpu.pc);
         // Verify the previous address was stored on the stack (sp+2)
-        let stack_addr: u16 = bus.read(cpu.sp.wrapping_add(2));
+        let stack_addr: u16 = cpu.stack.pop().expect("This should return test_addr");
         assert_eq!(stack_addr, curr_addr);
     }
 
@@ -595,7 +592,7 @@ mod math {
                 for reg in 0..=0xff {
                     let (x, y) = (reg & 0xf, reg >> 4);
                     // set the register under test to `word`
-                    (cpu.v[x], cpu.v[y]) = dbg!(0, word);
+                    (cpu.v[x], cpu.v[y]) = (0, word);
 
                     cpu.shift_left(x, y);
 

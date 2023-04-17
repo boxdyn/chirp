@@ -129,14 +129,11 @@ impl State {
                     Program [0x0200..0x1000] = &read(&options.file)?,
                     // Create a screen
                     Screen  [0x1000..0x1100],
-                    // Create a stack
-                    Stack   [0x0EA0..0x0F00],
                 },
                 cpu: CPU::new(
                     0x1000,
                     0x50,
                     0x200,
-                    0xefe,
                     Dis::default(),
                     options.breakpoints,
                     Flags {

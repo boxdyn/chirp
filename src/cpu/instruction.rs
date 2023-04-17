@@ -13,9 +13,9 @@ impl CPU {
         match instruction {
             // Core Chip-8 instructions
             Insn::cls               => self.clear_screen(bus),
-            Insn::ret               => self.ret(bus),
+            Insn::ret               => self.ret(),
             Insn::jmp   {       A } => self.jump(A),
-            Insn::call  {       A } => self.call(A, bus),
+            Insn::call  {       A } => self.call(A),
             Insn::seb   {    x, B } => self.skip_equals_immediate(x, B),
             Insn::sneb  {    x, B } => self.skip_not_equals_immediate(x, B),
             Insn::se    { y, x    } => self.skip_equals(x, y),
@@ -74,9 +74,8 @@ impl CPU {
     }
     /// |`00ee`| Returns from subroutine
     #[inline(always)]
-    pub(super) fn ret(&mut self, bus: &impl ReadWrite<u16>) {
-        self.sp = self.sp.wrapping_add(2);
-        self.pc = bus.read(self.sp);
+    pub(super) fn ret(&mut self) {
+        self.pc = self.stack.pop().unwrap_or(0x200);
     }
 }
 
@@ -97,9 +96,8 @@ impl CPU {
 impl CPU {
     /// |`2aaa`| Pushes pc onto the stack, then jumps to a
     #[inline(always)]
-    pub(super) fn call(&mut self, a: Adr, bus: &mut impl ReadWrite<u16>) {
-        bus.write(self.sp, self.pc);
-        self.sp = self.sp.wrapping_sub(2);
+    pub(super) fn call(&mut self, a: Adr) {
+        self.stack.push(self.pc);
         self.pc = a;
     }
 }

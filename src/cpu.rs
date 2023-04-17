@@ -55,9 +55,10 @@ pub struct CPU {
     // memory map info
     screen: Adr,
     font: Adr,
+    // memory
+    stack: Vec<Adr>,
     // registers
     pc: Adr,
-    sp: Adr,
     i: Adr,
     v: [u8; 16],
     delay: f64,
@@ -93,7 +94,6 @@ impl CPU {
         screen: Adr,
         font: Adr,
         pc: Adr,
-        sp: Adr,
         disassembler: Dis,
         breakpoints: Vec<Adr>,
         flags: Flags,
@@ -103,7 +103,6 @@ impl CPU {
             screen,
             font,
             pc,
-            sp,
             breakpoints,
             flags,
             ..Default::default()
@@ -548,7 +547,7 @@ impl CPU {
         std::println!(
             "PC: {:04x}, SP: {:04x}, I: {:04x}\n{}DLY: {}, SND: {}, CYC: {:6}",
             self.pc,
-            self.sp,
+            self.stack.len(),
             self.i,
             self.v
                 .into_iter()
@@ -588,10 +587,10 @@ impl Default for CPU {
     /// ```
     fn default() -> Self {
         CPU {
+            stack: vec![],
             screen: 0xf00,
             font: 0x050,
             pc: 0x200,
-            sp: 0xefe,
             i: 0,
             v: [0; 16],
             delay: 0.0,

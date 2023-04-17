@@ -30,11 +30,11 @@ mod bus {
         }
         #[test]
         fn display() {
-            println!("{Charset}{Program}{Screen}{Stack}{Count}");
+            println!("{Charset}{Program}{Screen}{Count}");
         }
         #[test]
         fn debug() {
-            println!("{Charset:?}{Program:?}{Screen:?}{Stack:?}{Count:?}");
+            println!("{Charset:?}{Program:?}{Screen:?}{Count:?}");
         }
         // lmao the things you do for test coverage
         #[test]
@@ -44,13 +44,13 @@ mod bus {
         }
         #[test]
         fn ord() {
-            assert_eq!(Stack, Charset.max(Program).max(Screen).max(Stack));
-            assert!(Charset < Program && Program < Screen && Screen < Stack);
+            assert_eq!(Screen, Charset.max(Program).max(Screen));
+            assert!(Charset < Program && Program < Screen);
         }
         #[test]
         fn hash() {
             let mut hasher = DefaultHasher::new();
-            Stack.hash(&mut hasher);
+            Program.hash(&mut hasher);
             println!("{hasher:?}");
         }
     }

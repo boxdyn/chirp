@@ -88,8 +88,6 @@ pub enum Region {
     Program,
     /// Screen buffer
     Screen,
-    /// Stack space
-    Stack,
     #[doc(hidden)]
     /// Total number of named regions
     Count,
@@ -104,7 +102,6 @@ impl Display for Region {
                 Region::Charset => "Charset",
                 Region::Program => "Program",
                 Region::Screen => "Screen",
-                Region::Stack => "Stack",
                 _ => "",
             }
         )
@@ -348,7 +345,7 @@ impl Bus {
             #[cfg(feature = "drawille")]
             {
                 use drawille::Canvas;
-                let mut canvas = Canvas::new(dbg!(width * 8), dbg!(height));
+                let mut canvas = Canvas::new(width * 8, height);
                 let width = width * 8;
                 screen
                     .iter()
