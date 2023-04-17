@@ -18,7 +18,7 @@ fn setup_environment() -> (CPU, Bus) {
             // Load the ROM file into RAM
             Program [0x0200..0x1000],
             // Create a screen, and fill it with garbage
-            Screen  [0x0F00..0x1000] = include_bytes!("chip8_test_suite.rs"),
+            Screen  [0x0F00..0x1000] = b"jsuadhgufywegrwsdyfogbbg4owgbrt",
         },
     )
 }

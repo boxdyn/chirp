@@ -18,7 +18,7 @@ use std::{
 /// # use chirp::*;
 /// let mut bus = bus! {
 ///     Stack   [0x0000..0x0800] = b"ABCDEF",
-///     Program [0x0800..0x1000] = include_bytes!("bus.rs"),
+///     Program [0x0800..0xf000] = include_bytes!("bus.rs"),
 /// };
 /// ```
 #[macro_export]
