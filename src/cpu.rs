@@ -9,7 +9,6 @@ mod tests;
 pub mod bus;
 pub mod disassembler;
 pub mod flags;
-pub mod init;
 pub mod instruction;
 pub mod mode;
 pub mod quirks;
