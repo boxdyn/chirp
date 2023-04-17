@@ -5,7 +5,6 @@
 //! TODO: Destroy this all.
 
 use std::{
-    ffi::OsStr,
     path::{Path, PathBuf},
     time::Instant,
 };
@@ -267,29 +266,28 @@ pub fn identify_key(key: Key) -> Option<usize> {
 }
 
 pub fn debug_dump_screen(ch8: &Chip8, rom: &Path) -> Result<()> {
-    let path = PathBuf::new()
-        .join("src/cpu/tests/screens/")
-        .join(if rom.is_absolute() {
-            Path::new("unknown/")
-        } else {
-            rom.file_name().unwrap_or(OsStr::new("unknown")).as_ref()
-        })
-        .join(format!("{}.bin", ch8.cpu.cycle()));
-    std::fs::write(
+    let mut path = PathBuf::new().join(format!(
+        "{}_{}.bin",
+        rom.file_stem().unwrap_or_default().to_string_lossy(),
+        ch8.cpu.cycle()
+    ));
+    path.set_extension("bin");
+    if let Ok(_) = std::fs::write(
         &path,
         ch8.bus
             .get_region(Region::Screen)
             .expect("Region::Screen should exist"),
-    )
-    .unwrap_or_else(|_| {
-        std::fs::write(
-            "screendump.bin",
-            ch8.bus
-                .get_region(Region::Screen)
-                .expect("Region::Screen should exist"),
-        )
-        .ok(); // lmao
-    });
-    eprintln!("Saved to {}", &path.display());
+    ) {
+        eprintln!("Saved to {}", &path.display());
+    } else if let Ok(_) = std::fs::write(
+        "screen_dump.bin",
+        ch8.bus
+            .get_region(Region::Screen)
+            .expect("Region::Screen should exist"),
+    ) {
+        eprintln!("Saved to screen_dump.bin");
+    } else {
+        eprintln!("Failed to dump screen to file.")
+    }
     Ok(())
 }
