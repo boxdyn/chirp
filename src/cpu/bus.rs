@@ -24,27 +24,58 @@ use std::{
 #[macro_export]
 macro_rules! bus {
     ($($name:path $(:)? [$range:expr] $(= $data:expr)?) ,* $(,)?) => {
-        $crate::bus::Bus::default()
+        $crate::cpu::bus::Bus::default()
         $(
-            .add_region($name, $range)
+            .add_region_owned($name, $range)
             $(
-                .load_region($name, $data)
+                .load_region_owned($name, $data)
             )?
         )*
     };
 }
 
-// Traits Read and Write are here purely to make implementing other things more bearable
-/// Read a T from address `addr`
-pub trait Read<T> {
-    /// Read a T from address `addr`
-    fn read(&self, addr: impl Into<usize>) -> T;
-}
+pub mod read;
+pub use read::{Get, ReadWrite};
 
-/// Write "some data" to the Bus
-pub trait Write<T> {
-    /// Write a T to address `addr`
-    fn write(&mut self, addr: impl Into<usize>, data: T);
+// Traits Read and Write are here purely to make implementing other things more bearable
+impl Get<u8> for Bus {
+    /// Gets a slice of [Bus] memory
+    /// # Examples
+    /// ```rust
+    ///# use chirp::*;
+    ///# fn main() -> Result<()> {
+    ///     let bus = Bus::new()
+    ///         .add_region_owned(Program, 0..10);
+    ///     assert!([0;10].as_slice() == bus.get(0..10).unwrap());
+    ///#    Ok(())
+    ///# }
+    /// ```
+    #[inline(always)]
+    fn get<I>(&self, index: I) -> Option<&<I as SliceIndex<[u8]>>::Output>
+    where
+        I: SliceIndex<[u8]>,
+    {
+        self.memory.get(index)
+    }
+
+    /// Gets a mutable slice of [Bus] memory
+    /// # Examples
+    /// ```rust
+    ///# use chirp::*;
+    ///# fn main() -> Result<()> {
+    ///     let mut bus = Bus::new()
+    ///         .add_region_owned(Program, 0..10);
+    ///     assert!([0;10].as_slice() == bus.get_mut(0..10).unwrap());
+    ///#    Ok(())
+    ///# }
+    /// ```
+    #[inline(always)]
+    fn get_mut<I>(&mut self, index: I) -> Option<&mut <I as SliceIndex<[u8]>>::Output>
+    where
+        I: SliceIndex<[u8]>,
+    {
+        self.memory.get_mut(index)
+    }
 }
 
 /// Represents a named region in memory
@@ -70,10 +101,10 @@ impl Display for Region {
             f,
             "{}",
             match self {
-                Region::Charset => "charset",
-                Region::Program => "program",
-                Region::Screen => "screen",
-                Region::Stack => "stack",
+                Region::Charset => "Charset",
+                Region::Program => "Program",
+                Region::Screen => "Screen",
+                Region::Stack => "Stack",
                 _ => "",
             }
         )
@@ -109,7 +140,7 @@ impl Bus {
     ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
-    ///         .add_region(Program, 0..1234);
+    ///         .add_region_owned(Program, 0..1234);
     ///     assert_eq!(1234, bus.len());
     ///#    Ok(())
     ///# }
@@ -149,30 +180,40 @@ impl Bus {
             self.memory.resize(size, 0);
         }
     }
-    /// Adds a new named range (Region) to the bus
+
+    /// Adds a new names range ([Region]) to an owned [Bus]
+    pub fn add_region_owned(mut self, name: Region, range: Range<usize>) -> Self {
+        self.add_region(name, range);
+        self
+    }
+
+    /// Adds a new named range ([Region]) to a [Bus]
     /// # Examples
     /// ```rust
     ///# use chirp::*;
     ///# fn main() -> Result<()> {
-    ///     let bus = Bus::new().add_region(Program, 0..1234);
+    ///     let mut bus = Bus::new();
+    ///     bus.add_region(Program, 0..1234);
     ///     assert_eq!(1234, bus.len());
     ///#    Ok(())
     ///# }
     /// ```
-    pub fn add_region(mut self, name: Region, range: Range<usize>) -> Self {
+    pub fn add_region(&mut self, name: Region, range: Range<usize>) -> &mut Self {
         self.with_size(range.end);
         if let Some(region) = self.region.get_mut(name as usize) {
             *region = Some(range);
         }
         self
     }
-    /// Updates an existing named range (Region)
+
+    /// Updates an existing [Region]
     /// # Examples
     /// ```rust
     ///# use chirp::*;
     ///# fn main() -> Result<()> {
-    ///     let bus = Bus::new().add_region(Program, 0..1234);
-    ///     assert_eq!(1234, bus.len());
+    ///     let mut bus = Bus::new().add_region_owned(Program, 0..1234);
+    ///     bus.set_region(Program, 1234..2345);
+    ///     assert_eq!(2345, bus.len());
     ///#    Ok(())
     ///# }
     /// ```
@@ -183,32 +224,40 @@ impl Bus {
         }
         self
     }
-    /// Loads data into a named region
+
+    /// Loads data into a [Region] on an *owned* [Bus], for use during initialization
+    pub fn load_region_owned(mut self, name: Region, data: &[u8]) -> Self {
+        self.load_region(name, data).ok();
+        self
+    }
+
+    /// Loads data into a named [Region]
     /// # Examples
     /// ```rust
     ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
-    ///         .add_region(Program, 0..1234)
-    ///         .load_region(Program, b"Hello, world!");
+    ///         .add_region_owned(Program, 0..1234)
+    ///         .load_region(Program, b"Hello, world!")?;
     ///# // TODO: Test if region actually contains "Hello, world!"
     ///#    Ok(())
     ///# }
     /// ```
-    pub fn load_region(mut self, name: Region, data: &[u8]) -> Self {
+    pub fn load_region(&mut self, name: Region, data: &[u8]) -> Result<&mut Self> {
         use std::io::Write;
         if let Some(mut region) = self.get_region_mut(name) {
-            region.write(data).ok(); // TODO: THIS SUCKS
+            assert_eq!(region.write(data)?, data.len());
         }
-        self
+        Ok(self)
     }
-    /// Fills a named region with zeroes
+
+    /// Fills a [Region] with zeroes
     /// # Examples
     /// ```rust
     ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
-    ///         .add_region(Program, 0..1234)
+    ///         .add_region_owned(Program, 0..1234)
     ///         .clear_region(Program);
     ///# // TODO: test if region actually clear
     ///#    Ok(())
@@ -219,7 +268,7 @@ impl Bus {
     ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
-    ///         .add_region(Program, 0..1234)
+    ///         .add_region_owned(Program, 0..1234)
     ///         .clear_region(Screen);
     ///# // TODO: test if region actually clear
     ///#    Ok(())
@@ -232,54 +281,20 @@ impl Bus {
         self
     }
 
-    /// Gets a slice of bus memory
+    /// Gets a slice of a named [Region] of memory
     /// # Examples
     /// ```rust
     ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
-    ///         .add_region(Program, 0..10);
-    ///     assert!([0;10].as_slice() == bus.get(0..10).unwrap());
-    ///#    Ok(())
-    ///# }
-    /// ```
-    pub fn get<I>(&self, index: I) -> Option<&<I as SliceIndex<[u8]>>::Output>
-    where
-        I: SliceIndex<[u8]>,
-    {
-        self.memory.get(index)
-    }
-
-    /// Gets a mutable slice of bus memory
-    /// # Examples
-    /// ```rust
-    ///# use chirp::*;
-    ///# fn main() -> Result<()> {
-    ///     let mut bus = Bus::new()
-    ///         .add_region(Program, 0..10);
-    ///     assert!([0;10].as_slice() == bus.get_mut(0..10).unwrap());
-    ///#    Ok(())
-    ///# }
-    /// ```
-    pub fn get_mut<I>(&mut self, index: I) -> Option<&mut <I as SliceIndex<[u8]>>::Output>
-    where
-        I: SliceIndex<[u8]>,
-    {
-        self.memory.get_mut(index)
-    }
-
-    /// Gets a slice of a named region of memory
-    /// # Examples
-    /// ```rust
-    ///# use chirp::*;
-    ///# fn main() -> Result<()> {
-    ///     let bus = Bus::new()
-    ///         .add_region(Program, 0..10);
+    ///         .add_region_owned(Program, 0..10);
     ///     assert!([0;10].as_slice() == bus.get_region(Program).unwrap());
     ///#    Ok(())
     ///# }
     /// ```
+    #[inline(always)]
     pub fn get_region(&self, name: Region) -> Option<&[u8]> {
+        debug_assert!(self.region.get(name as usize).is_some());
         self.get(self.region.get(name as usize)?.clone()?)
     }
 
@@ -289,12 +304,14 @@ impl Bus {
     ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let mut bus = Bus::new()
-    ///         .add_region(Program, 0..10);
+    ///         .add_region_owned(Program, 0..10);
     ///     assert!([0;10].as_slice() == bus.get_region_mut(Program).unwrap());
     ///#    Ok(())
     ///# }
     /// ```
+    #[inline(always)]
     pub fn get_region_mut(&mut self, name: Region) -> Option<&mut [u8]> {
+        debug_assert!(self.region.get(name as usize).is_some());
         self.get_mut(self.region.get(name as usize)?.clone()?)
     }
 
@@ -306,7 +323,7 @@ impl Bus {
     ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let bus = Bus::new()
-    ///         .add_region(Screen, 0x000..0x100);
+    ///         .add_region_owned(Screen, 0x000..0x100);
     ///     bus.print_screen()?;
     ///#    Ok(())
     ///# }
@@ -316,7 +333,7 @@ impl Bus {
     ///# use chirp::*;
     ///# fn main() -> Result<()> {
     ///     let mut bus = Bus::new()
-    ///         .add_region(Program, 0..10);
+    ///         .add_region_owned(Program, 0..10);
     ///     bus.print_screen()?;
     ///#    Ok(())
     ///# }
@@ -326,27 +343,24 @@ impl Bus {
         if let Some(screen) = self.get_region(REGION) {
             let len_log2 = screen.len().ilog2() / 2;
             #[allow(unused_variables)]
-            let (width, height) = (2u32.pow(len_log2 - 1), 2u32.pow(len_log2));
+            let (width, height) = (2u32.pow(len_log2 - 1), 2u32.pow(len_log2 + 1) - 1);
             // draw with the drawille library, if available
             #[cfg(feature = "drawille")]
             {
                 use drawille::Canvas;
-                let mut canvas = Canvas::new(width * 8, height);
+                let mut canvas = Canvas::new(dbg!(width * 8), dbg!(height));
                 let width = width * 8;
                 screen
                     .iter()
                     .enumerate()
                     .flat_map(|(bytei, byte)| {
-                        (0..8)
-                            .into_iter()
-                            .enumerate()
-                            .filter_map(move |(biti, bit)| {
-                                if (byte << bit) & 0x80 != 0 {
-                                    Some(bytei * 8 + biti)
-                                } else {
-                                    None
-                                }
-                            })
+                        (0..8).enumerate().filter_map(move |(biti, bit)| {
+                            if (byte << bit) & 0x80 != 0 {
+                                Some(bytei * 8 + biti)
+                            } else {
+                                None
+                            }
+                        })
                     })
                     .for_each(|index| canvas.set(index as u32 % (width), index as u32 / (width)));
                 println!("{}", canvas.frame());
@@ -368,112 +382,6 @@ impl Bus {
             return Err(MissingRegion { region: REGION });
         }
         Ok(())
-    }
-}
-
-impl Read<u8> for Bus {
-    /// Read a u8 from address `addr`
-    fn read(&self, addr: impl Into<usize>) -> u8 {
-        let addr: usize = addr.into();
-        *self.memory.get(addr).unwrap_or(&0xc5)
-    }
-}
-
-impl Read<u16> for Bus {
-    /// Read a u16 from address `addr`
-    fn read(&self, addr: impl Into<usize>) -> u16 {
-        let addr: usize = addr.into();
-        if let Some(bytes) = self.memory.get(addr..addr + 2) {
-            u16::from_be_bytes(bytes.try_into().expect("Should get 2 bytes"))
-        } else {
-            0xc5c5
-        }
-    }
-}
-
-impl Read<u32> for Bus {
-    /// Read a u16 from address `addr`
-    fn read(&self, addr: impl Into<usize>) -> u32 {
-        let addr: usize = addr.into();
-        if let Some(bytes) = self.memory.get(addr..addr + 4) {
-            u32::from_be_bytes(bytes.try_into().expect("Should get 4 bytes"))
-        } else {
-            0xc5c5
-        }
-    }
-}
-
-impl Read<u64> for Bus {
-    /// Read a u16 from address `addr`
-    fn read(&self, addr: impl Into<usize>) -> u64 {
-        let addr: usize = addr.into();
-        if let Some(bytes) = self.memory.get(addr..addr + 8) {
-            u64::from_be_bytes(bytes.try_into().expect("Should get 8 bytes"))
-        } else {
-            0xc5c5
-        }
-    }
-}
-
-impl Read<u128> for Bus {
-    /// Read a u16 from address `addr`
-    fn read(&self, addr: impl Into<usize>) -> u128 {
-        let addr: usize = addr.into();
-        if let Some(bytes) = self.memory.get(addr..addr + 16) {
-            u128::from_be_bytes(bytes.try_into().expect("Should get 16 bytes"))
-        } else {
-            0xc5c5
-        }
-    }
-}
-
-impl Write<u8> for Bus {
-    /// Write a u8 to address `addr`
-    fn write(&mut self, addr: impl Into<usize>, data: u8) {
-        let addr: usize = addr.into();
-        if let Some(byte) = self.get_mut(addr) {
-            *byte = data;
-        }
-    }
-}
-
-impl Write<u16> for Bus {
-    /// Write a u16 to address `addr`
-    fn write(&mut self, addr: impl Into<usize>, data: u16) {
-        let addr: usize = addr.into();
-        if let Some(slice) = self.get_mut(addr..addr + 2) {
-            data.to_be_bytes().as_mut().swap_with_slice(slice);
-        }
-    }
-}
-
-impl Write<u32> for Bus {
-    /// Write a u16 to address `addr`
-    fn write(&mut self, addr: impl Into<usize>, data: u32) {
-        let addr: usize = addr.into();
-        if let Some(slice) = self.get_mut(addr..addr + 4) {
-            data.to_be_bytes().as_mut().swap_with_slice(slice);
-        }
-    }
-}
-
-impl Write<u64> for Bus {
-    /// Write a u16 to address `addr`
-    fn write(&mut self, addr: impl Into<usize>, data: u64) {
-        let addr: usize = addr.into();
-        if let Some(slice) = self.get_mut(addr..addr + 8) {
-            data.to_be_bytes().as_mut().swap_with_slice(slice);
-        }
-    }
-}
-
-impl Write<u128> for Bus {
-    /// Write a u16 to address `addr`
-    fn write(&mut self, addr: impl Into<usize>, data: u128) {
-        let addr: usize = addr.into();
-        if let Some(slice) = self.get_mut(addr..addr + 16) {
-            data.to_be_bytes().as_mut().swap_with_slice(slice);
-        }
     }
 }
 

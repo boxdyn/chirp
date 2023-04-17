@@ -5,7 +5,7 @@
 
 use std::ops::Range;
 
-use crate::bus::Region;
+use crate::cpu::bus::Region;
 use thiserror::Error;
 
 /// Result type, equivalent to [std::result::Result]<T, [enum@Error]>
@@ -36,7 +36,7 @@ pub enum Error {
     },
     /// Tried to fetch [Range] from bus, received nothing
     #[error("Invalid range {range:04x?} for bus")]
-    InvalidBusRange {
+    InvalidAddressRange {
         /// The offending [Range]
         range: Range<usize>,
     },

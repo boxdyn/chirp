@@ -11,7 +11,7 @@ use std::{
 };
 
 use chirp::{
-    bus::{Bus, Region},
+    cpu::bus::{Bus, Region},
     error::Result,
     Chip8,
 };

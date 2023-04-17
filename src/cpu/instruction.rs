@@ -74,7 +74,7 @@ impl CPU {
     }
     /// |`00ee`| Returns from subroutine
     #[inline(always)]
-    pub(super) fn ret(&mut self, bus: &impl Read<u16>) {
+    pub(super) fn ret(&mut self, bus: &impl ReadWrite<u16>) {
         self.sp = self.sp.wrapping_add(2);
         self.pc = bus.read(self.sp);
     }
@@ -97,7 +97,7 @@ impl CPU {
 impl CPU {
     /// |`2aaa`| Pushes pc onto the stack, then jumps to a
     #[inline(always)]
-    pub(super) fn call(&mut self, a: Adr, bus: &mut impl Write<u16>) {
+    pub(super) fn call(&mut self, a: Adr, bus: &mut impl ReadWrite<u16>) {
         bus.write(self.sp, self.pc);
         self.sp = self.sp.wrapping_sub(2);
         self.pc = a;
@@ -518,7 +518,7 @@ impl CPU {
 
     /// |`00fb`| Scroll the screen right
     #[inline(always)]
-    pub(super) fn scroll_right(&mut self, bus: &mut (impl Read<u128> + Write<u128>)) {
+    pub(super) fn scroll_right(&mut self, bus: &mut (impl ReadWrite<u128> + ReadWrite<u128>)) {
         // Get a line from the bus
         for i in (0..16 * 64).step_by(16) {
             //let line: u128 = bus.read(self.screen + i) >> 4;
@@ -527,7 +527,7 @@ impl CPU {
     }
     /// |`00fc`| Scroll the screen right
     #[inline(always)]
-    pub(super) fn scroll_left(&mut self, bus: &mut (impl Read<u128> + Write<u128>)) {
+    pub(super) fn scroll_left(&mut self, bus: &mut (impl ReadWrite<u128> + ReadWrite<u128>)) {
         // Get a line from the bus
         for i in (0..16 * 64).step_by(16) {
             let line: u128 = (bus.read(self.screen + i) & !(0xf << 124)) << 4;
@@ -559,7 +559,7 @@ impl CPU {
         let w_bytes = w / 8;
         if let Some(sprite) = bus.get(self.i as usize..(self.i + 32) as usize) {
             let sprite = sprite.to_owned();
-            for (line, sprite) in sprite.chunks(2).enumerate() {
+            for (line, sprite) in sprite.chunks_exact(2).enumerate() {
                 let sprite = u16::from_be_bytes(
                     sprite
                         .try_into()

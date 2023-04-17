@@ -6,22 +6,22 @@
 #[cfg(test)]
 mod tests;
 
+pub mod bus;
 pub mod disassembler;
 pub mod flags;
+pub mod init;
 pub mod instruction;
 pub mod mode;
 pub mod quirks;
 
 use self::{
+    bus::{Bus, Get, ReadWrite, Region},
     disassembler::{Dis, Disassembler, Insn},
     flags::Flags,
     mode::Mode,
     quirks::Quirks,
 };
-use crate::{
-    bus::{Bus, Read, Region, Write},
-    error::{Error, Result},
-};
+use crate::error::{Error, Result};
 use imperative_rs::InstructionSet;
 use owo_colors::OwoColorize;
 use rand::random;
@@ -86,7 +86,7 @@ impl CPU {
     ///     0xefe,  // top of stack
     ///     Dis::default(),
     ///     vec![], // Breakpoints
-    ///     ControlFlags::default()
+    ///     Flags::default()
     /// );
     /// dbg!(cpu);
     /// ```
@@ -143,8 +143,8 @@ impl CPU {
     /// Releases a key, and reports whether the key's state changed.  
     /// If key is outside range `0..=0xF`, returns [Error::InvalidKey].
     ///
-    /// If [ControlFlags::keypause] was enabled, it is disabled,
-    /// and the [ControlFlags::lastkey] is recorded.
+    /// If [Flags::keypause] was enabled, it is disabled,
+    /// and the [Flags::lastkey] is recorded.
     /// # Examples
     /// ```rust
     /// # use chirp::*;
@@ -280,7 +280,7 @@ impl CPU {
     ///     0xefe,
     ///     Dis::default(),
     ///     vec![],
-    ///     ControlFlags::default()
+    ///     Flags::default()
     /// );
     /// cpu.flags.keypause = true;
     /// cpu.flags.draw_wait = true;
@@ -487,14 +487,13 @@ impl CPU {
                 .try_into()
                 .expect("`slice` should be exactly 2 bytes.")
         } else {
-            return Err(Error::InvalidBusRange {
+            return Err(Error::InvalidAddressRange {
                 range: self.pc as usize..self.pc as usize + 2,
             });
         };
 
         // Print opcode disassembly:
         if self.flags.debug {
-            println!("{:?}", self.timers.insn.elapsed().bright_black());
             self.timers.insn = Instant::now();
             std::print!(
                 "{:3} {:03x}: {:<36}",
@@ -512,6 +511,10 @@ impl CPU {
             return Err(Error::UnimplementedInstruction {
                 word: u16::from_be_bytes(*opcode),
             });
+        }
+
+        if self.flags.debug {
+            println!("{:?}", self.timers.insn.elapsed().bright_black());
         }
 
         // process breakpoints

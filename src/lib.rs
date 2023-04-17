@@ -8,13 +8,12 @@
 //!
 //! Hopefully, though, you'll find some use in it.
 
-pub mod bus;
 pub mod cpu;
 pub mod error;
 
 // Common imports for Chirp
-pub use bus::{Bus, Read, Region::*, Write};
 pub use cpu::{
+    bus::{Bus, Get, ReadWrite, Region::*},
     disassembler::{Dis, Disassembler},
     flags::Flags,
     mode::Mode,
@@ -29,5 +28,5 @@ pub struct Chip8 {
     /// Contains the registers, flags, and operating state for a single Chip-8
     pub cpu: cpu::CPU,
     /// Contains the memory of a chip-8
-    pub bus: bus::Bus,
+    pub bus: cpu::bus::Bus,
 }

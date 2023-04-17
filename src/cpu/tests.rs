@@ -15,7 +15,7 @@
 use super::*;
 use crate::{
     bus,
-    bus::{Bus, Region::*},
+    cpu::bus::{Bus, Region::*},
 };
 
 mod decode;
@@ -758,7 +758,7 @@ mod io {
                 // Debug mode is 5x slower
                 cpu.flags.debug = false;
                 // Load the test program
-                bus = bus.load_region(Program, test.program);
+                bus = bus.load_region_owned(Program, test.program);
                 // Run the test program for the specified number of steps
                 while cpu.cycle() < test.steps {
                     cpu.multistep(&mut bus, test.steps - cpu.cycle())
@@ -1151,7 +1151,7 @@ mod behavior {
         // The bus extends from 0x0..0x1000
         cpu.pc = 0xfff;
         match cpu.tick(&mut bus) {
-            Err(Error::InvalidBusRange { range }) => {
+            Err(Error::InvalidAddressRange { range }) => {
                 eprintln!("InvalidBusRange {{ {range:04x?} }}")
             }
             other => unreachable!("{other:04x?}"),
