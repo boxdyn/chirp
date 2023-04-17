@@ -17,7 +17,7 @@ use std::{
 /// ```rust
 /// # use chirp::*;
 /// let mut bus = bus! {
-///     Stack   [0x0000..0x0800] = b"ABCDEF",
+///     Charset   [0x0000..0x0800] = b"ABCDEF",
 ///     Program [0x0800..0xf000] = include_bytes!("bus.rs"),
 /// };
 /// ```

@@ -83,7 +83,6 @@ impl CPU {
     ///     0xf00,  // screen location
     ///     0x50,   // font location
     ///     0x200,  // start of program
-    ///     0xefe,  // top of stack
     ///     Dis::default(),
     ///     vec![], // Breakpoints
     ///     Flags::default()
@@ -275,7 +274,6 @@ impl CPU {
     ///     0xf00,
     ///     0x50,
     ///     0x340,
-    ///     0xefe,
     ///     Dis::default(),
     ///     vec![],
     ///     Flags::default()
@@ -577,8 +575,6 @@ impl Default for CPU {
     /// | screen |`0x0f00` | Location of screen memory.
     /// | font   |`0x0050` | Location of font memory.
     /// | pc     |`0x0200` | Start location. Generally 0x200 or 0x600.
-    /// | sp     |`0x0efe` | Initial top of stack.
-    ///
     ///
     /// # Examples
     /// ```rust
