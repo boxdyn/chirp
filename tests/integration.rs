@@ -226,6 +226,7 @@ mod quirks {
                 bin_ops: true,
                 shift: true,
                 draw_wait: true,
+                screen_wrap: false,
                 dma_inc: true,
                 stupid_jumps: true,
             }
@@ -241,6 +242,7 @@ mod quirks {
                 bin_ops: false,
                 shift: false,
                 draw_wait: false,
+                screen_wrap: false,
                 dma_inc: false,
                 stupid_jumps: false,
             }
@@ -253,6 +255,7 @@ mod quirks {
             bin_ops: false,
             shift: true,
             draw_wait: false,
+            screen_wrap: false,
             dma_inc: true,
             stupid_jumps: false,
         };

@@ -13,7 +13,7 @@
 //! Some of these tests run >16M times, which is very silly
 
 use super::*;
-pub(self) use crate::{
+use crate::{
     bus,
     bus::{Bus, Region::*},
 };
@@ -674,9 +674,9 @@ mod i {
 /// - Random number generation
 /// - Drawing to the display
 mod io {
+    use super::*;
     use std::io::Write;
 
-    use super::*;
     /// Cxbb: Stores a random number & the provided byte into vX
     #[test]
     fn rand() {
@@ -712,6 +712,7 @@ mod io {
                     bin_ops: false,
                     shift: false,
                     draw_wait: false,
+                    screen_wrap: true,
                     dma_inc: false,
                     stupid_jumps: false,
                 },
@@ -727,6 +728,7 @@ mod io {
                     bin_ops: false,
                     shift: false,
                     draw_wait: true,
+                    screen_wrap: true,
                     dma_inc: false,
                     stupid_jumps: false,
                 },
@@ -740,6 +742,7 @@ mod io {
                     bin_ops: false,
                     shift: false,
                     draw_wait: true,
+                    screen_wrap: true,
                     dma_inc: false,
                     stupid_jumps: false,
                 },

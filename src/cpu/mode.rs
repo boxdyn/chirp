@@ -1,8 +1,9 @@
 //! Selects the memory behavior of the [super::CPU]
 //!
-//! Since [super::Quirks] implements [From<Mode>],
+//! Since [Quirks] implements [`From<Mode>`],
 //! this can be used to select the appropriate quirk-set
 
+use super::Quirks;
 use crate::error::Error;
 use std::str::FromStr;
 
@@ -12,7 +13,7 @@ pub enum Mode {
     /// VIP emulation mode
     #[default]
     Chip8,
-    /// Chip-48 emulation mode
+    /// Super Chip emulation mode
     SChip,
     /// XO-Chip emulation mode
     XOChip,
@@ -29,6 +30,23 @@ impl FromStr for Mode {
             _ => Err(Error::InvalidMode {
                 mode: s.to_string(),
             }),
+        }
+    }
+}
+
+impl From<Mode> for Quirks {
+    fn from(value: Mode) -> Self {
+        match value {
+            Mode::Chip8 => false.into(),
+            Mode::SChip => true.into(),
+            Mode::XOChip => Self {
+                bin_ops: true,
+                shift: false,
+                draw_wait: true,
+                screen_wrap: true,
+                dma_inc: false,
+                stupid_jumps: false,
+            },
         }
     }
 }
