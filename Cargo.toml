@@ -2,7 +2,6 @@
 name = "chirp"
 version = "0.1.1"
 edition = "2021"
-ignore = ["justfile", ".gitmodules", "chip8-test-suite", "chip8Archive"]
 default-run = "chirp"
 authors = ["John Breaux"]
 license = "MIT"
