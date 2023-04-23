@@ -80,8 +80,10 @@ pub struct FrameBufferFormat {
 impl Default for FrameBufferFormat {
     fn default() -> Self {
         FrameBufferFormat {
-            fg: 0x0011a434,
-            bg: 0x001E2431,
+            // fg: 0x0011a434,
+            // bg: 0x001E2431,
+            fg: 0x00FFFF00,
+            bg: 0x00623701,
         }
     }
 }

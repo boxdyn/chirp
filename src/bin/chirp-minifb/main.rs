@@ -47,7 +47,7 @@ struct Arguments {
     #[options(help = "Enable pause mode at startup.")]
     pub pause: bool,
 
-    #[options(help = "Set the instructions-per-delay rate, or use realtime.")]
+    #[options(help = "Set the instructions-per-delay rate. If unspecified, use realtime.")]
     pub speed: Option<usize>,
     #[options(help = "Set the instructions-per-frame rate.")]
     pub step: Option<usize>,
@@ -76,16 +76,19 @@ struct Arguments {
         help = "Use CHIP-48 style DMA instructions, which don't touch I."
     )]
     pub memory: bool,
+
     #[options(
         short = "v",
         help = "Use CHIP-48 style bit-shifts, which don't touch vY."
     )]
     pub shift: bool,
+
     #[options(
         short = "b",
         help = "Use SUPER-CHIP style indexed jump, which is indexed relative to v[adr]."
     )]
     pub jumping: bool,
+
     #[options(
         long = "break",
         help = "Set breakpoints for the emulator to stop at.",
@@ -93,12 +96,14 @@ struct Arguments {
         meta = "BP"
     )]
     pub breakpoints: Vec<u16>,
+
     #[options(
         help = "Load additional word at address 0x1fe",
         parse(try_from_str = "parse_hex"),
         meta = "WORD"
     )]
     pub data: u16,
+
     #[options(help = "Set the target framerate.", default = "60", meta = "FR")]
     pub frame_rate: u64,
 }
@@ -131,7 +136,7 @@ impl State {
                     Screen  [0x1000..0x1100],
                 },
                 cpu: CPU::new(
-                    0x1000,
+                    &options.file,
                     0x50,
                     0x200,
                     Dis::default(),
@@ -143,7 +148,7 @@ impl State {
                         monotonic: options.speed,
                         ..Default::default()
                     },
-                ),
+                )?,
             },
             ui: UIBuilder::new(128, 64, &options.file).build()?,
             ft: Instant::now(),
@@ -189,9 +194,9 @@ impl State {
         Ok(())
     }
     fn wait_for_next_frame(&mut self) {
-        let rate = 1_000_000_000 / self.rate + 1;
-        std::thread::sleep(Duration::from_nanos(rate).saturating_sub(self.ft.elapsed()));
-        self.ft = Instant::now();
+        let rate = Duration::from_nanos(1_000_000_000 / self.rate + 1);
+        std::thread::sleep(rate.saturating_sub(self.ft.elapsed()));
+        self.ft = self.ft + rate;
     }
 }
 
