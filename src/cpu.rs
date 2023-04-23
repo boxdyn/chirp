@@ -37,6 +37,7 @@ type Nib = u8;
 
 /// Represents the internal state of the CPU interpreter
 #[derive(Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CPU {
     /// Flags that control how the CPU behaves, but which aren't inherent to the
     /// chip-8. Includes [Quirks], target IPF, etc.
@@ -57,6 +58,7 @@ pub struct CPU {
     // Execution data
     cycle: usize,
     breakpoints: Vec<Adr>,
+    #[cfg_attr(feature = "serde", serde(skip))]
     disassembler: Dis,
 }
 

@@ -81,6 +81,7 @@ impl Get<u8> for Bus {
 /// Represents a named region in memory
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Region {
     /// Character ROM (but writable!)
     Charset,
@@ -110,6 +111,7 @@ impl Display for Region {
 
 /// Stores memory in a series of named regions with ranges
 #[derive(Clone, Debug, Default, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Bus {
     memory: Vec<u8>,
     region: [Option<Range<usize>>; Region::Count as usize],
