@@ -3,6 +3,8 @@ use gumdrop::*;
 use owo_colors::OwoColorize;
 use std::{fs::read, path::PathBuf};
 
+mod tree;
+
 fn main() -> Result<()> {
     let options = Arguments::parse_args_default_or_exit();
     let contents = &read(&options.file)?;
