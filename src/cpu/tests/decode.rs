@@ -1,3 +1,6 @@
+// (c) 2023 John A. Breaux
+// This code is licensed under MIT license (see LICENSE for details)
+
 //! Exercises the instruction decode logic.
 use super::*;
 
@@ -9,9 +12,11 @@ fn run_single_op(op: &[u8]) -> CPU {
     let (mut cpu, mut bus) = (
         CPU::default(),
         bus! {
-            Program[0x200..0x240] = op,
+            Screen[0x0..0x1000],
         },
     );
+    cpu.screen
+        .load_region(Program, op).unwrap();
     cpu.v = *INDX;
     cpu.flags.quirks = Quirks::from(false);
     cpu.tick(&mut bus).unwrap(); // will panic if unimplemented

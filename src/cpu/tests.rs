@@ -17,11 +17,12 @@ use crate::{
     bus,
     cpu::bus::{Bus, Region::*},
 };
+use rand::random;
 
 mod decode;
 
 fn setup_environment() -> (CPU, Bus) {
-    (
+    let mut ch8 = (
         CPU {
             flags: Flags {
                 debug: true,
@@ -32,14 +33,14 @@ fn setup_environment() -> (CPU, Bus) {
             ..CPU::default()
         },
         bus! {
-            // Load the charset into ROM
-            Charset [0x0050..0x00A0] = include_bytes!("../mem/charset.bin"),
-            // Load the ROM file into RAM (dummy binary which contains nothing but `jmp pc+2`)
-            Program [0x0200..0x1000] = include_bytes!("tests/roms/jumptest.ch8"),
             // Create a screen
             Screen  [0x0F00..0x1000] = include_bytes!("../../chip8Archive/roms/1dcell.ch8"),
         },
-    )
+    );
+    ch8.0
+        .load_program_bytes(include_bytes!("tests/roms/jumptest.ch8"))
+        .unwrap();
+    ch8
 }
 
 fn print_screen(bytes: &[u8]) {
@@ -54,28 +55,28 @@ mod unimplemented {
     #[test]
     fn ins_5xyn() {
         let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0x500fu16);
+        cpu.screen.write(0x200u16, 0x500fu16);
         cpu.tick(&mut bus)
             .expect_err("0x500f is not an instruction");
     }
     #[test]
     fn ins_8xyn() {
         let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0x800fu16);
+        cpu.screen.write(0x200u16, 0x800fu16);
         cpu.tick(&mut bus)
             .expect_err("0x800f is not an instruction");
     }
     #[test]
     fn ins_9xyn() {
         let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0x900fu16);
+        cpu.screen.write(0x200u16, 0x900fu16);
         cpu.tick(&mut bus)
             .expect_err("0x900f is not an instruction");
     }
     #[test]
     fn ins_exbb() {
         let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0xe00fu16);
+        cpu.screen.write(0x200u16, 0xe00fu16);
         cpu.tick(&mut bus)
             .expect_err("0xe00f is not an instruction");
     }
@@ -83,7 +84,7 @@ mod unimplemented {
     #[test]
     fn ins_fxbb() {
         let (mut cpu, mut bus) = setup_environment();
-        bus.write(0x200u16, 0xf00fu16);
+        cpu.screen.write(0x200u16, 0xf00fu16);
         cpu.tick(&mut bus)
             .expect_err("0xf00f is not an instruction");
     }
@@ -755,10 +756,10 @@ mod io {
                 // Debug mode is 5x slower
                 cpu.flags.debug = false;
                 // Load the test program
-                bus = bus.load_region_owned(Program, test.program);
+                cpu.screen.load_region(Program, test.program).unwrap();
                 // Run the test program for the specified number of steps
                 while cpu.cycle() < test.steps {
-                    cpu.multistep(&mut bus, test.steps - cpu.cycle())
+                    cpu.multistep(&mut bus, 10.min(test.steps - cpu.cycle()))
                         .expect("Draw tests should not contain undefined instructions");
                 }
                 // Compare the screen to the reference screen buffer
@@ -948,7 +949,7 @@ mod io {
         /// Fx29: Load sprite for character vX into I
         #[test]
         fn load_sprite() {
-            let (mut cpu, bus) = setup_environment();
+            let (mut cpu, _) = setup_environment();
             for test in TESTS {
                 let reg = 0xf & random::<usize>();
                 // load number into CPU register
@@ -958,7 +959,8 @@ mod io {
 
                 let addr = cpu.i as usize;
                 assert_eq!(
-                    bus.get(addr..addr.wrapping_add(5))
+                    cpu.screen
+                        .get(addr..addr.wrapping_add(5))
                         .expect("Region at addr should exist!"),
                     test.output,
                 );
@@ -995,15 +997,18 @@ mod io {
         #[test]
         fn bcd_convert() {
             for test in BCD_TESTS {
-                let (mut cpu, mut bus) = setup_environment();
+                let (mut cpu, _) = setup_environment();
                 let addr = 0xff0 & random::<u16>() as usize;
                 // load CPU registers
                 cpu.i = addr as u16;
                 cpu.v[5] = test.input;
 
-                cpu.bcd_convert(5, &mut bus);
+                cpu.bcd_convert(5);
 
-                assert_eq!(bus.get(addr..addr.saturating_add(3)), Some(test.output))
+                assert_eq!(
+                    cpu.screen.get(addr..addr.saturating_add(3)),
+                    Some(test.output)
+                )
             }
         }
     }
@@ -1012,7 +1017,7 @@ mod io {
     // TODO: Test with dma_inc quirk set
     #[test]
     fn dma_store() {
-        let (mut cpu, mut bus) = setup_environment();
+        let (mut cpu, _) = setup_environment();
         const DATA: &[u8] = b"ABCDEFGHIJKLMNOP";
         // Load some test data into memory
         let addr = 0x456;
@@ -1023,9 +1028,10 @@ mod io {
         for len in 0..16 {
             // Perform DMA store
             cpu.i = addr as u16;
-            cpu.store_dma(len, &mut bus);
+            cpu.store_dma(len);
             // Check that bus grabbed the correct data
-            let bus = bus
+            let bus = cpu
+                .screen
                 .get_mut(addr..addr + DATA.len())
                 .expect("Getting a mutable slice at addr 0x0456 should not fail");
             assert_eq!(bus[0..=len], DATA[0..=len]);
@@ -1039,18 +1045,19 @@ mod io {
     // TODO: Test with dma_inc quirk set
     #[test]
     fn dma_load() {
-        let (mut cpu, mut bus) = setup_environment();
+        let (mut cpu, _) = setup_environment();
         const DATA: &[u8] = b"ABCDEFGHIJKLMNOP";
         // Load some test data into memory
         let addr = 0x456;
-        bus.get_mut(addr..addr + DATA.len())
+        cpu.screen
+            .get_mut(addr..addr + DATA.len())
             .expect("Getting a mutable slice at addr 0x0456..0x0466 should not fail")
             .write_all(DATA)
             .unwrap();
         for len in 0..16 {
             // Perform DMA load
             cpu.i = addr as u16;
-            cpu.load_dma(len, &mut bus);
+            cpu.load_dma(len);
             // Check that registers grabbed the correct data
             assert_eq!(cpu.v[0..=len], DATA[0..=len]);
             assert_eq!(cpu.v[len + 1..], [0; 16][len + 1..]);

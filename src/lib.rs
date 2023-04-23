@@ -14,8 +14,8 @@ pub mod error;
 // Common imports for Chirp
 pub use cpu::{
     bus::{Bus, Get, ReadWrite, Region::*},
-    disassembler::{Dis, Disassembler},
     flags::Flags,
+    instruction::disassembler::{Dis, Disassembler},
     mode::Mode,
     quirks::Quirks,
     CPU,

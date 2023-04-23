@@ -192,7 +192,7 @@ mod cpu {
 }
 
 mod dis {
-    use chirp::cpu::disassembler::Insn;
+    use chirp::cpu::instruction::Insn;
     use imperative_rs::InstructionSet;
 
     #[test]

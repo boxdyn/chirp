@@ -6,54 +6,43 @@
 #[cfg(test)]
 mod tests;
 
+pub mod behavior;
 pub mod bus;
-pub mod disassembler;
 pub mod flags;
 pub mod instruction;
 pub mod mode;
 pub mod quirks;
 
 use self::{
-    bus::{Bus, Get, ReadWrite, Region},
-    disassembler::{Dis, Disassembler, Insn},
+    bus::{Bus, Get, ReadWrite, Region::*},
     flags::Flags,
+    instruction::{
+        disassembler::{Dis, Disassembler},
+        Insn,
+    },
     mode::Mode,
     quirks::Quirks,
 };
-use crate::error::{Error, Result};
+use crate::{
+    bus,
+    error::{Error, Result},
+};
 use imperative_rs::InstructionSet;
 use owo_colors::OwoColorize;
-use rand::random;
-use std::time::Instant;
+use std::fmt::Debug;
 
 type Reg = usize;
 type Adr = u16;
 type Nib = u8;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Timers {
-    frame: Instant,
-    insn: Instant,
-}
-
-impl Default for Timers {
-    fn default() -> Self {
-        let now = Instant::now();
-        Self {
-            frame: now,
-            insn: now,
-        }
-    }
-}
-
 /// Represents the internal state of the CPU interpreter
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct CPU {
     /// Flags that control how the CPU behaves, but which aren't inherent to the
     /// chip-8. Includes [Quirks], target IPF, etc.
     pub flags: Flags,
     // memory map info
-    screen: Adr,
+    screen: Bus,
     font: Adr,
     // memory
     stack: Vec<Adr>,
@@ -66,7 +55,6 @@ pub struct CPU {
     // I/O
     keys: [bool; 16],
     // Execution data
-    timers: Timers,
     cycle: usize,
     breakpoints: Vec<Adr>,
     disassembler: Dis,
@@ -74,7 +62,6 @@ pub struct CPU {
 
 // public interface
 impl CPU {
-    // TODO: implement From<&bus> for CPU
     /// Constructs a new CPU, taking all configurable parameters
     /// # Examples
     /// ```rust
@@ -90,22 +77,36 @@ impl CPU {
     /// dbg!(cpu);
     /// ```
     pub fn new(
-        screen: Adr,
+        rom: impl AsRef<std::path::Path>,
         font: Adr,
         pc: Adr,
         disassembler: Dis,
         breakpoints: Vec<Adr>,
         flags: Flags,
-    ) -> Self {
-        CPU {
+    ) -> Result<Self> {
+        let mut cpu = CPU {
             disassembler,
-            screen,
             font,
             pc,
             breakpoints,
             flags,
             ..Default::default()
-        }
+        };
+        // load the provided rom
+        cpu.load_program(rom)?;
+        Ok(cpu)
+    }
+
+    /// Loads a program into the CPU's program space
+    pub fn load_program(&mut self, rom: impl AsRef<std::path::Path>) -> Result<&mut Self> {
+        self.load_program_bytes(&std::fs::read(rom)?)
+    }
+
+    /// Loads bytes into the CPU's program space
+    pub fn load_program_bytes(&mut self, rom: &[u8]) -> Result<&mut Self> {
+        self.screen.clear_region(Program);
+        self.screen.load_region(Program, rom)?;
+        Ok(self)
     }
 
     /// Presses a key, and reports whether the key's state changed.  
@@ -292,6 +293,35 @@ impl CPU {
         self.flags.draw_wait = false;
     }
 
+    /// Resets the emulator.
+    ///
+    /// Touches the [Flags] (keypause, draw_wait, draw_mode, and lastkey),
+    /// stack, pc, registers, keys, and cycle count.
+    ///
+    /// Does not touch [Quirks], [Mode], [Dis], breakpoints, or memory map.
+    pub fn reset(&mut self) {
+        self.flags = Flags {
+            keypause: false,
+            draw_wait: false,
+            draw_mode: false,
+            lastkey: None,
+            ..self.flags
+        };
+        // clear the stack
+        self.stack.truncate(0);
+        // Reset the program counter
+        self.pc = 0x200;
+        // Zero the registers
+        self.i = 0;
+        self.v = [0; 16];
+        self.delay = 0.0;
+        self.sound = 0.0;
+        // I/O
+        self.keys = [false; 16];
+        // Execution data
+        self.cycle = 0;
+    }
+
     /// Set a breakpoint
     // TODO: Unit test this
     pub fn set_break(&mut self, point: Adr) -> &mut Self {
@@ -378,53 +408,15 @@ impl CPU {
     /// assert_eq!(0x202, cpu.pc());
     /// assert_eq!(0x20, cpu.cycle());
     /// ```
-    pub fn multistep(&mut self, bus: &mut Bus, steps: usize) -> Result<&mut Self> {
+    pub fn multistep(&mut self, screen: &mut Bus, steps: usize) -> Result<&mut Self> {
         for _ in 0..steps {
-            self.tick(bus)?;
-            self.vertical_blank();
-        }
-        Ok(self)
-    }
-
-    /// Simulates vertical blanking
-    ///
-    /// If monotonic timing is `enabled`:
-    /// - Ticks the sound and delay timers according to CPU cycle count
-    /// - Disables framepause
-    /// If monotonic timing is `disabled`:
-    /// - Subtracts the elapsed time in fractions of a frame
-    ///   from st/dt
-    /// - Disables framepause if the duration exceeds that of a frame
-    #[inline(always)]
-    pub fn vertical_blank(&mut self) -> &mut Self {
-        if self.flags.pause {
-            return self;
-        }
-        // Use a monotonic counter when testing
-        if let Some(speed) = self.flags.monotonic {
-            if self.flags.draw_wait {
-                self.flags.draw_wait = self.cycle % speed != 0;
-            }
-            let speed = 1.0 / speed as f64;
+            self.tick(screen)?;
+            let speed = 1.0 / steps as f64;
             self.delay -= speed;
             self.sound -= speed;
-            return self;
-        };
-
-        // Convert the elapsed time to 60ths of a second
-        let frame = Instant::now();
-        let time = (frame - self.timers.frame).as_secs_f64() * 60.0;
-        self.timers.frame = frame;
-        if time > 1.0 {
-            self.flags.draw_wait = false;
         }
-        if self.delay > 0.0 {
-            self.delay -= time;
-        }
-        if self.sound > 0.0 {
-            self.sound -= time;
-        }
-        self
+        self.flags.draw_wait = false;
+        Ok(self)
     }
 
     /// Executes a single instruction
@@ -466,7 +458,7 @@ impl CPU {
     /// dbg!(cpu.tick(&mut bus))
     ///     .expect_err("Should return Error::InvalidInstruction { 0xffff }");
     /// ```
-    pub fn tick(&mut self, bus: &mut Bus) -> Result<&mut Self> {
+    pub fn tick(&mut self, screen: &mut Bus) -> Result<&mut Self> {
         // Do nothing if paused
         if self.flags.is_paused() {
             // always tick in test mode
@@ -505,17 +497,13 @@ impl CPU {
         }
 
         // decode opcode
-        if let Ok((inc, insn)) = Insn::decode(opcode) {
+        if let Ok((inc, insn)) = Insn::decode(opchunk) {
             self.pc = self.pc.wrapping_add(inc as u16);
-            self.execute(bus, insn);
+            self.execute(screen, insn);
         } else {
             return Err(Error::UnimplementedInstruction {
                 word: u16::from_be_bytes(*opcode),
             });
-        }
-
-        if self.flags.debug {
-            println!("{:?}", self.timers.insn.elapsed().bright_black());
         }
 
         // process breakpoints
@@ -523,7 +511,7 @@ impl CPU {
             self.flags.pause = true;
             return Err(Error::BreakpointHit {
                 addr: self.pc,
-                next: bus.read(self.pc),
+                next: self.screen.read(self.pc),
             });
         }
         Ok(self)
@@ -572,6 +560,25 @@ impl CPU {
     }
 }
 
+impl Debug for CPU {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CPU")
+            .field("flags", &self.flags)
+            .field("font", &self.font)
+            .field("stack", &self.stack)
+            .field("pc", &self.pc)
+            .field("i", &self.i)
+            .field("v", &self.v)
+            .field("delay", &self.delay)
+            .field("sound", &self.sound)
+            .field("keys", &self.keys)
+            .field("cycle", &self.cycle)
+            .field("breakpoints", &self.breakpoints)
+            .field("disassembler", &self.disassembler)
+            .finish_non_exhaustive()
+    }
+}
+
 impl Default for CPU {
     /// Constructs a new CPU with sane defaults and debug mode ON
     ///
@@ -589,7 +596,10 @@ impl Default for CPU {
     fn default() -> Self {
         CPU {
             stack: vec![],
-            screen: 0xf00,
+            screen: bus! {
+                Charset [0x0050..0x00a0] = include_bytes!("mem/charset.bin"),
+                Program [0x0200..0x1000],
+            },
             font: 0x050,
             pc: 0x200,
             i: 0,
@@ -602,7 +612,6 @@ impl Default for CPU {
                 debug: true,
                 ..Default::default()
             },
-            timers: Default::default(),
             breakpoints: vec![],
             disassembler: Dis::default(),
         }

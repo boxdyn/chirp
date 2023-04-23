@@ -2,20 +2,10 @@
 name = "chirp"
 version = "0.1.1"
 edition = "2021"
-default-run = "chirp"
+default-run = "chirp-imgui"
 authors = ["John Breaux"]
 license = "MIT"
 publish = false
-
-
-[features]
-default = ["unstable", "drawille", "minifb"]
-unstable = []
-drawille = ["dep:drawille"]
-iced = ["dep:iced"]
-minifb = ["dep:minifb"]
-rhexdump = ["dep:rhexdump"]
-serde = ["dep:serde"]
 
 [[bin]]
 name = "chirp"
@@ -27,12 +17,27 @@ name = "chirp-disasm"
 required-features = ["default"]
 
 [[bin]]
-name = "chirp-iced"
-required-features = ["iced"]
+name = "chirp-imgui"
+required-features = ["imgui"]
 
 [[bin]]
 name = "chirp-shot-viewer"
 required-features = ["default", "drawille"]
+
+[features]
+default = ["drawille", "imgui", "serde"]
+nightly = []
+drawille = ["dep:drawille"]
+imgui = [
+    "dep:imgui",
+    "dep:imgui-wgpu",
+    "dep:imgui-winit-support",
+    "dep:winit",
+    "dep:winit_input_helper",
+    "dep:pixels",
+]
+minifb = ["dep:minifb"]
+rhexdump = ["dep:rhexdump"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [profile.release]
@@ -48,14 +53,22 @@ overflow-checks = false
 
 
 [dependencies]
-drawille = {version = "0.3.0", optional = true}
-iced = {version = "0.8.0", optional = true}
-rhexdump = {version = "^0.1.1", optional = true }
-serde = { version = "^1.0", features = ["derive"], optional = true }
-minifb = { version = "^0.24.0", optional = true }
 
-gumdrop = "^0.8.1"
+imgui = { version = "^0.10", optional = true }
+imgui-winit-support = { version = "^0.10", optional = true }
+imgui-wgpu = { version = "^0", optional = true }
+pixels = { version = "^0", optional = true }
+# TODO: When imgui-winit-support updates to 0.28 (Soon:tm:), update winit and winit_input_helper
+winit = { version = "0.27.5", features = ["default", "x11"], optional = true }
+winit_input_helper = { version = "^0.13.0", optional = true }
+
+drawille = { version = "0.3.0", optional = true }
+rhexdump = { version = "0.1.1", optional = true }
+serde = { version = "1.0.0", features = ["derive"], optional = true }
+minifb = { version = "0.24.0", optional = true }
+
+gumdrop = "0.8.1"
 imperative-rs = "0.3.1"
-owo-colors = "^3"
-rand = "^0.8.5"
-thiserror = "^1.0.39"
+owo-colors = "3"
+rand = "0.8.5"
+thiserror = "1.0.39"

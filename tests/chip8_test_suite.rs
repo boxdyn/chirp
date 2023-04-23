@@ -11,7 +11,6 @@ fn setup_environment() -> (CPU, Bus) {
     cpu.flags = Flags {
         debug: true,
         pause: false,
-        monotonic: Some(10),
         ..Default::default()
     };
     (
@@ -36,10 +35,10 @@ struct SuiteTest {
 fn run_screentest(test: SuiteTest, mut cpu: CPU, mut bus: Bus) {
     // Set the test to run
     bus.write(0x1ffu16, test.test);
-    bus.load_region(Program, test.data).unwrap();
+    cpu.load_program_bytes(test.data).unwrap();
     // The test suite always initiates a keypause on test completion
-    while !(cpu.flags.keypause || cpu.flags.pause) {
-        cpu.multistep(&mut bus, 100).unwrap();
+    while !(cpu.flags.is_paused()) {
+        cpu.multistep(&mut bus, 10).unwrap();
     }
     // Compare the screen to the reference screen buffer
     bus.print_screen().unwrap();
