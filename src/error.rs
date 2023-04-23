@@ -3,7 +3,8 @@
 
 //! Error type for Chirp
 
-use std::ops::Range;
+pub mod any_range;
+use any_range::AnyRange;
 
 use crate::cpu::bus::Region;
 use thiserror::Error;
@@ -15,7 +16,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 pub enum Error {
     /// Represents a breakpoint being hit
-    #[error("Breakpoint hit: {addr:03x} ({next:04x})")]
+    #[error("breakpoint hit: {addr:03x} ({next:04x})")]
     BreakpointHit {
         /// The address of the breakpoint
         addr: u16,
@@ -23,37 +24,37 @@ pub enum Error {
         next: u16,
     },
     /// Represents an unimplemented operation
-    #[error("Unrecognized opcode: {word:04x}")]
+    #[error("opcode {word:04x} not recognized")]
     UnimplementedInstruction {
         /// The offending word
         word: u16,
     },
     /// The region you asked for was not defined
-    #[error("No {region} found on bus")]
+    #[error("region {region} is not present on bus")]
     MissingRegion {
         /// The offending [Region]
         region: Region,
     },
-    /// Tried to fetch [Range] from bus, received nothing
-    #[error("Invalid range {range:04x?} for bus")]
+    /// Tried to fetch data at [AnyRange] from bus, received nothing
+    #[error("range {range:04x?} is not present on bus")]
     InvalidAddressRange {
-        /// The offending [Range]
-        range: Range<usize>,
+        /// The offending [AnyRange]
+        range: AnyRange<usize>,
     },
     /// Tried to press a key that doesn't exist
-    #[error("Invalid key: {key:X}")]
+    #[error("tried to press key {key:X} which does not exist")]
     InvalidKey {
         /// The offending key
         key: usize,
     },
     /// Tried to get/set an out-of-bounds register
-    #[error("Invalid register: v{reg:X}")]
+    #[error("tried to access register v{reg:X} which does not exist")]
     InvalidRegister {
         /// The offending register
         reg: usize,
     },
     /// Tried to convert string into mode, but it did not match.
-    #[error("Invalid mode: {mode}")]
+    #[error("no suitable conversion of \"{mode}\" into Mode")]
     InvalidMode {
         /// The string which failed to become a mode
         mode: String,

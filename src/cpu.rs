@@ -476,22 +476,27 @@ impl CPU {
             return Ok(self);
         }
         self.cycle += 1;
+        let opchunk = self
+            .screen
+            .get(self.pc as usize..)
+            .ok_or(Error::InvalidAddressRange {
+                range: (self.pc as usize..).into(),
+            })?;
         // fetch opcode
-        let opcode: &[u8; 2] = if let Some(slice) = bus.get(self.pc as usize..self.pc as usize + 2)
-        {
-            slice
-                .try_into()
-                .expect("`slice` should be exactly 2 bytes.")
-        } else {
-            return Err(Error::InvalidAddressRange {
-                range: self.pc as usize..self.pc as usize + 2,
-            });
-        };
+        let opcode: &[u8; 2] =
+            if let Some(slice) = self.screen.get(self.pc as usize..self.pc as usize + 2) {
+                slice
+                    .try_into()
+                    .expect("`slice` should be exactly 4 bytes.")
+            } else {
+                return Err(Error::InvalidAddressRange {
+                    range: (self.pc as usize..self.pc as usize + 4).into(),
+                });
+            };
 
         // Print opcode disassembly:
         if self.flags.debug {
-            self.timers.insn = Instant::now();
-            std::print!(
+            std::println!(
                 "{:3} {:03x}: {:<36}",
                 self.cycle.bright_black(),
                 self.pc,
