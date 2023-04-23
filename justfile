@@ -1,3 +1,6 @@
+# (c) 2023 John A. Breaux
+# This code is licensed under MIT license (see LICENSE for details)
+
 # Some common commands for working on this stuff
 
 # Run All Tests

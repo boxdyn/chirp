@@ -1,9 +1,13 @@
+// (c) 2023 John A. Breaux
+// This code is licensed under MIT license (see LICENSE for details)
+
 //! Represents [Flags] that aid in implementation but aren't a part of the Chip-8 spec
 
 use super::{Mode, Quirks};
 
 /// Represents flags that aid in implementation but aren't a part of the Chip-8 spec
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Flags {
     /// Set when debug (live disassembly) mode enabled
     pub debug: bool,

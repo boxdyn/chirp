@@ -1,9 +1,13 @@
+// (c) 2023 John A. Breaux
+// This code is licensed under MIT license (see LICENSE for details)
+
 //! Controls the [Quirks] behavior of the CPU on a granular level.
 
 /// Controls the quirk behavior of the CPU on a granular level.
 ///
 /// `false` is Cosmac-VIP-like behavior
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Quirks {
     /// Super Chip: Binary ops in `8xy`(`1`, `2`, `3`) shouldn't set vF to 0
     pub bin_ops: bool,

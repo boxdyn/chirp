@@ -1,3 +1,7 @@
+// (c) 2023 John A. Breaux
+// This code is licensed under MIT license (see LICENSE for details)
+// When compiled, the resulting binary is licensed under version 3 of the GNU General Public License (see chip8-test-suite/LICENSE for details)
+
 //! These are a series of interpreter tests using Timendus's incredible test suite
 
 pub use chirp::*;

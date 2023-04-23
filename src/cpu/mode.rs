@@ -1,3 +1,6 @@
+// (c) 2023 John A. Breaux
+// This code is licensed under MIT license (see LICENSE for details)
+
 //! Selects the memory behavior of the [super::CPU]
 //!
 //! Since [Quirks] implements [`From<Mode>`],
@@ -8,7 +11,8 @@ use crate::error::Error;
 use std::str::FromStr;
 
 /// Selects the memory behavior of the interpreter
-#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Mode {
     /// VIP emulation mode
     #[default]

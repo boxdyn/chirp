@@ -3,6 +3,7 @@ use chirp::*;
 use std::{collections::hash_map::DefaultHasher, hash::Hash};
 
 #[test]
+#[allow(clippy::redundant_clone)]
 fn chip8() {
     let ch8 = Chip8::default(); // Default
     let ch82 = ch8.clone(); // Clone
@@ -125,6 +126,7 @@ mod cpu {
         use super::*;
         //#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
         #[test]
+        #[allow(clippy::redundant_clone)]
         fn clone() {
             let cf1 = Flags {
                 debug: false,
@@ -259,6 +261,7 @@ mod quirks {
             dma_inc: true,
             stupid_jumps: false,
         };
+        #[allow(clippy::clone_on_copy)]
         let q2 = q1.clone();
         assert_eq!(q1, q2);
     }

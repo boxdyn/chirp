@@ -1,5 +1,5 @@
 // (c) 2023 John A. Breaux
-// This code is licensed under MIT license (see LICENSE.txt for details)
+// This code is licensed under MIT license (see LICENSE for details)
 #![allow(missing_docs)]
 //! Platform-specific IO/UI code, and some debug functionality.
 //! TODO: Destroy this all.
