@@ -875,8 +875,7 @@ mod io {
         for word in 0..=0xff {
             for x in 0..=0xf {
                 // set the register under test to `word`
-                cpu.delay = word as f64;
-
+                cpu.delay = word;
                 cpu.load_delay_timer(x);
 
                 assert_eq!(cpu.v[x], word);
@@ -895,7 +894,7 @@ mod io {
 
                 cpu.store_delay_timer(x);
 
-                assert_eq!(cpu.delay, word as f64);
+                assert_eq!(cpu.delay, word);
             }
         }
     }
@@ -911,7 +910,7 @@ mod io {
 
                 cpu.store_sound_timer(x);
 
-                assert_eq!(cpu.sound, word as f64);
+                assert_eq!(cpu.sound, word);
             }
         }
     }
@@ -1072,28 +1071,28 @@ mod behavior {
         #[test]
         fn delay() {
             let (mut cpu, mut bus) = setup_environment();
-            cpu.delay = 10.0;
             cpu.flags.monotonic = false;
+            cpu.delay = 10;
             for _ in 0..2 {
                 cpu.multistep(&mut bus, 8)
                     .expect("Running valid instructions should always succeed");
                 std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
             }
             // time is within 1 frame deviance over a theoretical 2 frame pause
-            assert!(7.0 <= cpu.delay && cpu.delay <= 9.0);
+            assert_eq!(cpu.delay, 8);
         }
         #[test]
         fn sound() {
             let (mut cpu, mut bus) = setup_environment();
-            cpu.sound = 10.0;
             cpu.flags.monotonic = false; // disable monotonic timing
+            cpu.sound = 10;
             for _ in 0..2 {
                 cpu.multistep(&mut bus, 8)
                     .expect("Running valid instructions should always succeed");
                 std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
             }
             // time is within 1 frame deviance over a theoretical 2 frame pause
-            assert!(7.0 <= cpu.sound && cpu.sound <= 9.0);
+            assert_eq!(cpu.sound, 8);
         }
         #[test]
         fn vbi_wait() {

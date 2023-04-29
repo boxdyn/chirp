@@ -520,7 +520,7 @@ impl CPU {
     /// ```
     #[inline(always)]
     pub(super) fn load_delay_timer(&mut self, x: Reg) {
-        self.v[x] = self.delay as u8;
+        self.v[x] = self.delay;
     }
     /// |`Fx0A`| Wait for key, then vX = K
     #[inline(always)]
@@ -539,7 +539,7 @@ impl CPU {
     /// ```
     #[inline(always)]
     pub(super) fn store_delay_timer(&mut self, x: Reg) {
-        self.delay = self.v[x] as f64;
+        self.delay = self.v[x];
     }
     /// |`Fx18`| Load vX into ST
     /// ```py
@@ -547,7 +547,7 @@ impl CPU {
     /// ```
     #[inline(always)]
     pub(super) fn store_sound_timer(&mut self, x: Reg) {
-        self.sound = self.v[x] as f64;
+        self.sound = self.v[x];
     }
     /// |`Fx1e`| Add vX to I,
     /// ```py

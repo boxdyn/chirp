@@ -51,8 +51,8 @@ pub struct CPU {
     pc: Adr,
     i: Adr,
     v: [u8; 16],
-    delay: f64,
-    sound: f64,
+    delay: u8,
+    sound: u8,
     // I/O
     keys: [bool; 16],
     /// Set to the last key that's been *released* after a keypause
@@ -257,7 +257,7 @@ impl CPU {
     /// assert_eq!(0, cpu.sound());
     /// ```
     pub fn sound(&self) -> u8 {
-        self.sound as u8
+        self.sound
     }
 
     /// Gets the value in the Delay Timer register
@@ -268,7 +268,7 @@ impl CPU {
     /// assert_eq!(0, cpu.delay());
     /// ```
     pub fn delay(&self) -> u8 {
-        self.delay as u8
+        self.delay
     }
 
     /// Gets the number of cycles the CPU has executed
@@ -332,8 +332,8 @@ impl CPU {
         // Zero the registers
         self.i = 0;
         self.v = [0; 16];
-        self.delay = 0.0;
-        self.sound = 0.0;
+        self.delay = 0;
+        self.sound = 0;
         // I/O
         self.keys = [false; 16];
         self.lastkey = None;
@@ -415,25 +415,22 @@ impl CPU {
     /// ```rust
     /// # use chirp::*;
     /// let mut cpu = CPU::default();
-    /// let mut bus = bus!{
-    ///     Program [0x0200..0x0f00] = &[
-    ///         0x00, 0xe0, // cls
-    ///         0x22, 0x02, // jump 0x202 (pc)
-    ///     ],
-    ///     Screen  [0x0f00..0x1000],
+    /// let mut screen = bus!{
+    ///     Screen  [0x000..0x100],
     /// };
-    /// cpu.multistep(&mut bus, 0x20)
+    /// cpu.load_program_bytes(&[0x00, 0xe0, 0x22, 0x02]);
+    /// cpu.multistep(&mut screen, 0x20)
     ///     .expect("The program should only have valid opcodes.");
     /// assert_eq!(0x202, cpu.pc());
     /// assert_eq!(0x20, cpu.cycle());
     /// ```
     pub fn multistep(&mut self, screen: &mut Bus, steps: usize) -> Result<&mut Self> {
+        //let speed = 1.0 / steps as f64;
         for _ in 0..steps {
             self.tick(screen)?;
-            let speed = 1.0 / steps as f64;
-            self.delay -= speed;
-            self.sound -= speed;
         }
+        self.delay = self.delay.saturating_sub(1);
+        self.sound = self.sound.saturating_sub(1);
         self.flags.draw_wait = false;
         Ok(self)
     }
@@ -613,8 +610,8 @@ impl Default for CPU {
             pc: 0x200,
             i: 0,
             v: [0; 16],
-            delay: 0.0,
-            sound: 0.0,
+            delay: 0,
+            sound: 0,
             cycle: 0,
             keys: [false; 16],
             lastkey: None,
