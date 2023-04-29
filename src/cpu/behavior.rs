@@ -71,11 +71,13 @@ impl CPU {
 /// |`00ee`| Return from subroutine             |
 impl CPU {
     /// |`00e0`| Clears the screen memory to 0
+    /// Corresponds to [Insn::cls]
     #[inline(always)]
     pub(super) fn clear_screen(&mut self, bus: &mut Bus) {
         bus.clear_region(Region::Screen);
     }
     /// |`00ee`| Returns from subroutine
+    /// Corresponds to [Insn::ret]
     #[inline(always)]
     pub(super) fn ret(&mut self) {
         self.pc = self.stack.pop().unwrap_or(0x200);
@@ -94,6 +96,8 @@ impl CPU {
 impl CPU {
     /// # |`00cN`|
     /// Scroll the screen down N lines
+    ///
+    /// Corresponds to [Insn::scd]
     #[inline(always)]
     pub(super) fn scroll_down(&mut self, n: Nib, screen: &mut Bus) {
         match self.flags.draw_mode {
@@ -118,6 +122,8 @@ impl CPU {
 
     /// # |`00fb`|
     /// Scroll the screen right
+    ///
+    /// Corresponds to [Insn::scr]
     #[inline(always)]
     pub(super) fn scroll_right(&mut self, screen: &mut impl ReadWrite<u128>) {
         // Get a line from the bus
@@ -127,7 +133,9 @@ impl CPU {
         }
     }
     /// # |`00fc`|
-    ///  Scroll the screen left
+    /// Scroll the screen left
+    ///
+    /// Corresponds to [Insn::scl]
     #[inline(always)]
     pub(super) fn scroll_left(&mut self, screen: &mut impl ReadWrite<u128>) {
         // Get a line from the bus
@@ -138,6 +146,8 @@ impl CPU {
     }
     /// # |`00fe`|
     /// Initialize lores mode
+    ///
+    /// Corresponds to [Insn::lores]
     pub(super) fn init_lores(&mut self, screen: &mut Bus) {
         self.flags.draw_mode = false;
         screen.set_region(Region::Screen, 0..256);
@@ -145,6 +155,8 @@ impl CPU {
     }
     /// # |`00ff`|
     /// Initialize hires mode
+    ///
+    /// Corresponds to [Insn::hires]
     pub(super) fn init_hires(&mut self, screen: &mut Bus) {
         self.flags.draw_mode = true;
         screen.set_region(Region::Screen, 0..1024);
@@ -155,6 +167,8 @@ impl CPU {
 /// |`1aaa`| Sets pc to an absolute address
 impl CPU {
     /// |`1aaa`| Sets the program counter to an absolute address
+    ///
+    /// Corresponds to [Insn::jmp]
     #[inline(always)]
     pub(super) fn jump(&mut self, a: Adr) {
         // jump to self == halt
@@ -168,6 +182,8 @@ impl CPU {
 /// |`2aaa`| Pushes pc onto the stack, then jumps to a
 impl CPU {
     /// |`2aaa`| Pushes pc onto the stack, then jumps to a
+    ///
+    /// Corresponds to [Insn::call]
     #[inline(always)]
     pub(super) fn call(&mut self, a: Adr) {
         self.stack.push(self.pc);
@@ -178,6 +194,8 @@ impl CPU {
 /// |`3xbb`| Skips next instruction if register X == b
 impl CPU {
     /// |`3xbb`| Skips the next instruction if register X == b
+    ///
+    /// Corresponds to [Insn::seb]
     #[inline(always)]
     pub(super) fn skip_equals_immediate(&mut self, x: Reg, b: u8) {
         if self.v[x] == b {
@@ -189,6 +207,8 @@ impl CPU {
 /// |`4xbb`| Skips next instruction if register X != b
 impl CPU {
     /// |`4xbb`| Skips the next instruction if register X != b
+    ///
+    /// Corresponds to [Insn::sneb]
     #[inline(always)]
     pub(super) fn skip_not_equals_immediate(&mut self, x: Reg, b: u8) {
         if self.v[x] != b {
@@ -204,6 +224,8 @@ impl CPU {
 /// |`5XY0`| Skip next instruction if vX == vY  |
 impl CPU {
     /// |`5xy0`| Skips the next instruction if register X != register Y
+    ///
+    /// Corresponds to [Insn::sne]
     #[inline(always)]
     pub(super) fn skip_equals(&mut self, x: Reg, y: Reg) {
         if self.v[x] == self.v[y] {
@@ -215,6 +237,8 @@ impl CPU {
 /// |`6xbb`| Loads immediate byte b into register vX
 impl CPU {
     /// |`6xbb`| Loads immediate byte b into register vX
+    ///
+    /// Corresponds to [Insn::movb]
     #[inline(always)]
     pub(super) fn load_immediate(&mut self, x: Reg, b: u8) {
         self.v[x] = b;
@@ -224,6 +248,8 @@ impl CPU {
 /// |`7xbb`| Adds immediate byte b to register vX
 impl CPU {
     /// |`7xbb`| Adds immediate byte b to register vX
+    ///
+    /// Corresponds to [Insn::addb]
     #[inline(always)]
     pub(super) fn add_immediate(&mut self, x: Reg, b: u8) {
         self.v[x] = self.v[x].wrapping_add(b);
@@ -245,11 +271,15 @@ impl CPU {
 /// |`8xyE`| X = X << 1                         |
 impl CPU {
     /// |`8xy0`| Loads the value of y into x
+    ///
+    /// Corresponds to [Insn::mov]
     #[inline(always)]
     pub(super) fn load(&mut self, x: Reg, y: Reg) {
         self.v[x] = self.v[y];
     }
     /// |`8xy1`| Performs bitwise or of vX and vY, and stores the result in vX
+    ///
+    /// Corresponds to [Insn::or]
     ///
     /// # Quirk
     /// The original chip-8 interpreter will clobber vF for any 8-series instruction
@@ -262,6 +292,8 @@ impl CPU {
     }
     /// |`8xy2`| Performs bitwise and of vX and vY, and stores the result in vX
     ///
+    /// Corresponds to [Insn::and]
+    ///
     /// # Quirk
     /// The original chip-8 interpreter will clobber vF for any 8-series instruction
     #[inline(always)]
@@ -273,6 +305,8 @@ impl CPU {
     }
     /// |`8xy3`| Performs bitwise xor of vX and vY, and stores the result in vX
     ///
+    /// Corresponds to [Insn::xor]
+    ///
     /// # Quirk
     /// The original chip-8 interpreter will clobber vF for any 8-series instruction
     #[inline(always)]
@@ -283,6 +317,8 @@ impl CPU {
         }
     }
     /// |`8xy4`| Performs addition of vX and vY, and stores the result in vX
+    ///
+    /// Corresponds to [Insn::add]
     #[inline(always)]
     pub(super) fn add(&mut self, x: Reg, y: Reg) {
         let carry;
@@ -290,6 +326,8 @@ impl CPU {
         self.v[0xf] = carry.into();
     }
     /// |`8xy5`| Performs subtraction of vX and vY, and stores the result in vX
+    ///
+    /// Corresponds to [Insn::sub]
     #[inline(always)]
     pub(super) fn sub(&mut self, x: Reg, y: Reg) {
         let carry;
@@ -297,6 +335,8 @@ impl CPU {
         self.v[0xf] = (!carry).into();
     }
     /// |`8xy6`| Performs bitwise right shift of vX
+    ///
+    /// Corresponds to [Insn::shr]
     ///
     /// # Quirk
     /// On the original chip-8 interpreter, this shifts vY and stores the result in vX
@@ -308,6 +348,8 @@ impl CPU {
         self.v[0xf] = shift_out;
     }
     /// |`8xy7`| Performs subtraction of vY and vX, and stores the result in vX
+    ///
+    /// Corresponds to [Insn::bsub]
     #[inline(always)]
     pub(super) fn backwards_sub(&mut self, x: Reg, y: Reg) {
         let carry;
@@ -315,6 +357,8 @@ impl CPU {
         self.v[0xf] = (!carry).into();
     }
     /// 8X_E: Performs bitwise left shift of vX
+    ///
+    /// Corresponds to [Insn::shl]
     ///
     /// # Quirk
     /// On the original chip-8 interpreter, this would perform the operation on vY
@@ -335,6 +379,8 @@ impl CPU {
 /// |`9XY0`| Skip next instruction if vX != vY  |
 impl CPU {
     /// |`9xy0`| Skip next instruction if X != y
+    ///
+    /// Corresponds to [Insn::sne]
     #[inline(always)]
     pub(super) fn skip_not_equals(&mut self, x: Reg, y: Reg) {
         if self.v[x] != self.v[y] {
@@ -346,6 +392,8 @@ impl CPU {
 /// |`Aaaa`| Load address #a into register I
 impl CPU {
     /// |`Aadr`| Load address #adr into register I
+    ///
+    /// Corresponds to [Insn::movI]
     #[inline(always)]
     pub(super) fn load_i_immediate(&mut self, a: Adr) {
         self.i = a;
@@ -355,6 +403,8 @@ impl CPU {
 /// |`Baaa`| Jump to &adr + v0
 impl CPU {
     /// |`Badr`| Jump to &adr + v0
+    ///
+    /// Corresponds to [Insn::jmpr]
     ///
     /// Quirk:
     /// On the Super-Chip, this does stupid shit
@@ -372,6 +422,8 @@ impl CPU {
 /// |`Cxbb`| Stores a random number & the provided byte into vX
 impl CPU {
     /// |`Cxbb`| Stores a random number & the provided byte into vX
+    ///
+    /// Corresponds to [Insn::rand]
     #[inline(always)]
     pub(super) fn rand(&mut self, x: Reg, b: u8) {
         self.v[x] = random::<u8>() & b;
@@ -381,6 +433,8 @@ impl CPU {
 /// |`Dxyn`| Draws n-byte sprite to the screen at coordinates (vX, vY)
 impl CPU {
     /// |`Dxyn`| Draws n-byte sprite to the screen at coordinates (vX, vY)
+    ///
+    /// Corresponds to [Insn::draw]
     ///
     /// # Quirk
     /// On the original chip-8 interpreter, this will wait for a VBI
@@ -485,6 +539,8 @@ impl CPU {
 /// |`eXa1`| Skip next instruction if key != vX |
 impl CPU {
     /// |`Ex9E`| Skip next instruction if key == vX
+    ///
+    /// Corresponds to [Insn::sek]
     #[inline(always)]
     pub(super) fn skip_key_equals(&mut self, x: Reg) {
         if self.keys[self.v[x] as usize & 0xf] {
@@ -492,6 +548,8 @@ impl CPU {
         }
     }
     /// |`ExaE`| Skip next instruction if key != vX
+    ///
+    /// Corresponds to [Insn::snek]
     #[inline(always)]
     pub(super) fn skip_key_not_equals(&mut self, x: Reg) {
         if !self.keys[self.v[x] as usize & 0xf] {
@@ -515,6 +573,9 @@ impl CPU {
 /// |`fX65`| DMA Load from I to registers 0..=X |
 impl CPU {
     /// |`Fx07`| Get the current DT, and put it in vX
+    ///
+    /// Corresponds to [Insn::getdt]
+    ///
     /// ```py
     /// vX = DT
     /// ```
@@ -534,6 +595,8 @@ impl CPU {
         }
     }
     /// |`Fx15`| Load vX into DT
+    ///
+    /// Corresponds to [Insn::setdt]
     /// ```py
     /// DT = vX
     /// ```
@@ -542,6 +605,8 @@ impl CPU {
         self.delay = self.v[x];
     }
     /// |`Fx18`| Load vX into ST
+    ///
+    /// Corresponds to [Insn::movst]
     /// ```py
     /// ST = vX;
     /// ```
@@ -550,6 +615,8 @@ impl CPU {
         self.sound = self.v[x];
     }
     /// |`Fx1e`| Add vX to I,
+    ///
+    /// Corresponds to [Insn::addI]
     /// ```py
     /// I += vX;
     /// ```
@@ -558,6 +625,8 @@ impl CPU {
         self.i += self.v[x] as u16;
     }
     /// |`Fx29`| Load sprite for character x into I
+    ///
+    /// Corresponds to [Insn::font]
     /// ```py
     /// I = sprite(X);
     /// ```
@@ -566,6 +635,8 @@ impl CPU {
         self.i = self.font + (5 * (self.v[x] as Adr % 0x10));
     }
     /// |`Fx33`| BCD convert X into I`[0..3]`
+    ///
+    /// Corresponds to [Insn::bcd]
     #[inline(always)]
     pub(super) fn bcd_convert(&mut self, x: Reg) {
         let x = self.v[x];
@@ -574,6 +645,8 @@ impl CPU {
         self.mem.write(self.i, x / 100 % 10);
     }
     /// |`Fx55`| DMA Stor from I to registers 0..=X
+    ///
+    /// Corresponds to [Insn::dmao]
     ///
     /// # Quirk
     /// The original chip-8 interpreter uses I to directly index memory,
@@ -595,6 +668,8 @@ impl CPU {
         }
     }
     /// |`Fx65`| DMA Load from I to registers 0..=X
+    ///
+    /// Corresponds to [Insn::dmai]
     ///
     /// # Quirk
     /// The original chip-8 interpreter uses I to directly index memory,
@@ -627,6 +702,8 @@ impl CPU {
 impl CPU {
     /// |`Fx30`| (Super-Chip) 16x16 equivalent of [CPU::load_sprite]
     ///
+    /// Corresponds to [Insn::hfont]
+    ///
     /// TODO: Actually make and import the 16x font
     #[inline(always)]
     pub(super) fn load_big_sprite(&mut self, x: Reg) {
@@ -635,6 +712,8 @@ impl CPU {
 
     /// |`Fx75`| (Super-Chip) Save to "flag registers"
     /// I just chuck it in 0x0..0xf. Screw it.
+    ///
+    /// Corresponds to [Insn::flgo]
     #[inline(always)]
     pub(super) fn store_flags(&mut self, x: Reg) {
         // TODO: Save these, maybe
@@ -651,6 +730,8 @@ impl CPU {
 
     /// |`Fx85`| (Super-Chip) Load from "flag registers"
     /// I just chuck it in 0x0..0xf. Screw it.
+    ///
+    /// Corresponds to [Insn::flgi]
     #[inline(always)]
     pub(super) fn load_flags(&mut self, x: Reg) {
         for (reg, value) in self.mem.get(0..=x).unwrap_or_default().iter().enumerate() {
