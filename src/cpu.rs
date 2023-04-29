@@ -451,7 +451,7 @@ impl CPU {
     /// # use chirp::error::Error;
     /// let mut cpu = CPU::default();
     /// # cpu.flags.debug = true;        // enable live disassembly
-    /// # cpu.flags.monotonic = Some(8); // enable monotonic/test timing
+    /// # cpu.flags.monotonic = true; // enable monotonic/test timing
     /// let mut bus = bus!{
     ///     Program [0x0200..0x0f00] = &[
     ///         0xff, 0xff, // invalid!
@@ -466,7 +466,7 @@ impl CPU {
         // Do nothing if paused
         if self.flags.is_paused() {
             // always tick in test mode
-            if self.flags.monotonic.is_some() {
+            if self.flags.monotonic {
                 self.cycle += 1;
             }
             return Ok(self);

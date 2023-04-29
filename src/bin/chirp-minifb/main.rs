@@ -145,7 +145,6 @@ impl State {
                         quirks: options.mode.unwrap_or_default().into(),
                         debug: options.debug,
                         pause: options.pause,
-                        monotonic: options.speed,
                         ..Default::default()
                     },
                 )?,

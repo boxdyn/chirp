@@ -23,8 +23,8 @@ pub struct Flags {
     pub mode: Mode,
     /// Represents the set of emulator [Quirks] to enable, independent of the [Mode]
     pub quirks: Quirks,
-    /// Represents the number of instructions to run per tick of the internal timer
-    pub monotonic: Option<usize>,
+    /// Set when the interpreter should increase the cycle count during a pause
+    pub monotonic: bool,
 }
 
 impl Flags {

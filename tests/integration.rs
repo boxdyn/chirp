@@ -133,7 +133,6 @@ mod cpu {
                 pause: false,
                 keypause: false,
                 draw_wait: false,
-                monotonic: None,
                 ..Default::default()
             };
             let cf2 = cf1.clone();

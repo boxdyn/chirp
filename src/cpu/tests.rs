@@ -27,7 +27,6 @@ fn setup_environment() -> (CPU, Bus) {
             flags: Flags {
                 debug: true,
                 pause: false,
-                monotonic: Some(8),
                 ..Default::default()
             },
             ..CPU::default()
@@ -1076,8 +1075,8 @@ mod behavior {
         #[test]
         fn delay() {
             let (mut cpu, mut bus) = setup_environment();
-            cpu.flags.monotonic = None;
             cpu.delay = 10.0;
+            cpu.flags.monotonic = false;
             for _ in 0..2 {
                 cpu.multistep(&mut bus, 8)
                     .expect("Running valid instructions should always succeed");
@@ -1102,7 +1101,7 @@ mod behavior {
         #[test]
         fn vbi_wait() {
             let (mut cpu, mut bus) = setup_environment();
-            cpu.flags.monotonic = None; // disable monotonic timing
+            cpu.flags.monotonic = false; // disable monotonic timing
             cpu.flags.draw_wait = true;
             for _ in 0..2 {
                 cpu.multistep(&mut bus, 8)
