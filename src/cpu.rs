@@ -6,7 +6,7 @@
 #[cfg(test)]
 mod tests;
 
-pub mod behavior;
+mod behavior;
 pub mod bus;
 pub mod flags;
 pub mod instruction;
@@ -71,33 +71,41 @@ impl CPU {
     /// ```rust
     /// # use chirp::*;
     /// let cpu = CPU::new(
-    ///     0xf00,  // screen location
-    ///     0x50,   // font location
-    ///     0x200,  // start of program
+    ///     None::<&str>, // ROM to load
+    ///     0x50,         // font location
+    ///     0x200,        // start of program
     ///     Dis::default(),
-    ///     vec![], // Breakpoints
+    ///     vec![],       // Breakpoints
     ///     Flags::default()
     /// );
     /// dbg!(cpu);
     /// ```
     pub fn new(
-        rom: impl AsRef<std::path::Path>,
+        rom: Option<impl AsRef<std::path::Path>>,
         font: Adr,
         pc: Adr,
         disassembler: Dis,
         breakpoints: Vec<Adr>,
         flags: Flags,
     ) -> Result<Self> {
+        const CHARSET: &[u8] = include_bytes!("mem/charset.bin");
+        let mem = bus! {
+            Charset [font as usize..font as usize + CHARSET.len()] = CHARSET,
+            Program [pc as usize..0x1000],
+        };
         let mut cpu = CPU {
             disassembler,
             font,
             pc,
             breakpoints,
             flags,
+            mem,
             ..Default::default()
         };
         // load the provided rom
-        cpu.load_program(rom)?;
+        if let Some(rom) = rom {
+            cpu.load_program(rom)?;
+        }
         Ok(cpu)
     }
 
@@ -161,7 +169,7 @@ impl CPU {
     /// If key is outside range `0..=0xF`, returns [Error::InvalidKey].
     ///
     /// If [Flags::keypause] was enabled, it is disabled,
-    /// and the [Flags::lastkey] is recorded.
+    /// and the lastkey is recorded.
     /// # Examples
     /// ```rust
     /// # use chirp::*;
@@ -291,13 +299,13 @@ impl CPU {
     /// ```rust
     /// # use chirp::*;
     /// let mut cpu = CPU::new(
-    ///     0xf00,
+    ///     None::<&str>,
     ///     0x50,
     ///     0x340,
     ///     Dis::default(),
     ///     vec![],
     ///     Flags::default()
-    /// );
+    /// ).unwrap();
     /// cpu.flags.keypause = true;
     /// cpu.flags.draw_wait = true;
     /// assert_eq!(0x340, cpu.pc());
@@ -389,14 +397,11 @@ impl CPU {
     /// ```rust
     /// # use chirp::*;
     /// let mut cpu = CPU::default();
-    /// let mut bus = bus!{
-    ///     Program [0x0200..0x0f00] = &[
-    ///         0x00, 0xe0, // cls
-    ///         0x22, 0x02, // jump 0x202 (pc)
-    ///     ],
-    ///     Screen  [0x0f00..0x1000],
+    /// let mut screen = bus!{
+    ///     Screen  [0x000..0x100],
     /// };
-    /// cpu.singlestep(&mut bus).unwrap();
+    /// cpu.load_program_bytes(&[0x00, 0xe0, 0x22, 0x02]);
+    /// cpu.singlestep(&mut screen).unwrap();
     /// assert_eq!(0x202, cpu.pc());
     /// assert_eq!(1, cpu.cycle());
     /// ```
@@ -559,8 +564,8 @@ impl CPU {
                     )
                 })
                 .collect::<String>(),
-            self.delay as u8,
-            self.sound as u8,
+            self.delay,
+            self.sound,
             self.cycle,
         );
     }
