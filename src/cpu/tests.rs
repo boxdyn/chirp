@@ -861,7 +861,7 @@ mod io {
                     assert!(cpu.release(key).expect("Key should be released"));
                     assert!(!cpu.release(key).expect("Key shouldn't be released again"));
                     assert!(!cpu.flags.keypause);
-                    assert_eq!(Some(key), cpu.flags.lastkey);
+                    assert_eq!(Some(key), cpu.lastkey);
                     cpu.wait_for_key(x);
                     assert_eq!(key as u8, cpu.v[x]);
                 }

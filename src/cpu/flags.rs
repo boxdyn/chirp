@@ -19,8 +19,6 @@ pub struct Flags {
     pub draw_wait: bool,
     /// Set when the emulator is in high-res mode
     pub draw_mode: bool,
-    /// Set to the last key that's been *released* after a keypause
-    pub lastkey: Option<usize>,
     /// Represents the current emulator [Mode]
     pub mode: Mode,
     /// Represents the set of emulator [Quirks] to enable, independent of the [Mode]

@@ -55,6 +55,8 @@ pub struct CPU {
     sound: f64,
     // I/O
     keys: [bool; 16],
+    /// Set to the last key that's been *released* after a keypause
+    pub lastkey: Option<usize>,
     // Execution data
     cycle: usize,
     breakpoints: Vec<Adr>,
@@ -163,7 +165,7 @@ impl CPU {
             if *keyref {
                 *keyref = false;
                 if self.flags.keypause {
-                    self.flags.lastkey = Some(key);
+                    self.lastkey = Some(key);
                     self.flags.keypause = false;
                 }
                 return Ok(true);
@@ -306,7 +308,6 @@ impl CPU {
             keypause: false,
             draw_wait: false,
             draw_mode: false,
-            lastkey: None,
             ..self.flags
         };
         // clear the stack
@@ -320,6 +321,7 @@ impl CPU {
         self.sound = 0.0;
         // I/O
         self.keys = [false; 16];
+        self.lastkey = None;
         // Execution data
         self.cycle = 0;
     }
@@ -610,6 +612,7 @@ impl Default for CPU {
             sound: 0.0,
             cycle: 0,
             keys: [false; 16],
+            lastkey: None,
             flags: Flags {
                 debug: true,
                 ..Default::default()

@@ -133,7 +133,6 @@ mod cpu {
                 pause: false,
                 keypause: false,
                 draw_wait: false,
-                lastkey: None,
                 monotonic: None,
                 ..Default::default()
             };

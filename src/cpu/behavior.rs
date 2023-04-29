@@ -528,9 +528,9 @@ impl CPU {
     /// |`Fx0A`| Wait for key, then vX = K
     #[inline(always)]
     pub(super) fn wait_for_key(&mut self, x: Reg) {
-        if let Some(key) = self.flags.lastkey {
+        if let Some(key) = self.lastkey {
             self.v[x] = key as u8;
-            self.flags.lastkey = None;
+            self.lastkey = None;
         } else {
             self.pc = self.pc.wrapping_sub(2);
             self.flags.keypause = true;
