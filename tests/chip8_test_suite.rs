@@ -16,12 +16,8 @@ fn setup_environment() -> (CPU, Bus) {
     (
         cpu,
         bus! {
-            // Load the charset into ROM
-            Charset [0x0050..0x00A0] = include_bytes!("../src/mem/charset.bin"),
-            // Load the ROM file into RAM
-            Program [0x0200..0x1000],
             // Create a screen, and fill it with garbage
-            Screen  [0x0F00..0x1000] = b"jsuadhgufywegrwsdyfogbbg4owgbrt",
+            Screen  [0x000..0x100] = b"jsuadhgufywegrwsdyfogbbg4owgbrt",
         },
     )
 }
@@ -34,11 +30,14 @@ struct SuiteTest {
 
 fn run_screentest(test: SuiteTest, mut cpu: CPU, mut bus: Bus) {
     // Set the test to run
-    bus.write(0x1ffu16, test.test);
+    cpu.poke(0x1ffu16, test.test);
     cpu.load_program_bytes(test.data).unwrap();
     // The test suite always initiates a keypause on test completion
     while !(cpu.flags.is_paused()) {
         cpu.multistep(&mut bus, 10).unwrap();
+        if cpu.cycle() > 1000000 {
+            panic!("test {} took too long", test.test)
+        }
     }
     // Compare the screen to the reference screen buffer
     bus.print_screen().unwrap();

@@ -704,7 +704,7 @@ mod io {
             ScreenTest {
                 program: include_bytes!("../../chip-8/IBM Logo.ch8"),
                 screen: include_bytes!("tests/screens/IBM Logo.ch8/20.bin"),
-                steps: 56,
+                steps: 21,
                 quirks: Quirks {
                     bin_ops: false,
                     shift: false,
@@ -1151,7 +1151,7 @@ mod behavior {
         cpu.pc = 0xfff;
         match cpu.tick(&mut bus) {
             Err(Error::InvalidAddressRange { range }) => {
-                eprintln!("InvalidBusRange {{ {range:04x?} }}")
+                eprintln!("InvalidAddressRange {{ {range:04x?} }}")
             }
             other => unreachable!("{other:04x?}"),
         }
