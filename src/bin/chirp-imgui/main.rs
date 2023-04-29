@@ -1,8 +1,13 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::all)]
 #![allow(dead_code)] // TODO: finish writing the code
+
+mod emu;
+mod error;
+mod gui;
+
+use crate::emu::*;
 use crate::gui::*;
-use chirp::*;
 use core::panic;
 use pixels::{Pixels, SurfaceTexture};
 use std::result::Result;
@@ -12,23 +17,25 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-mod error;
-mod gui;
+// TODO: Make these configurable in the frontend
 
 const FOREGROUND: &[u8; 4] = &0xFFFF00FF_u32.to_be_bytes();
 const BACKGROUND: &[u8; 4] = &0x623701FF_u32.to_be_bytes();
+const INIT_SPEED: usize = 10;
 
-/// The state of the application
-#[derive(Debug)]
-struct Emulator {
+struct Application {
     gui: Gui,
-    screen: Bus,
-    cpu: CPU,
-    ipf: usize,
-    colors: [[u8; 4]; 2],
+    emu: Emulator,
 }
 
 fn main() -> Result<(), error::Error> {
+    let rom_path;
+    if let Some(path) = std::env::args().nth(1) {
+        rom_path = path;
+    } else {
+        panic!("Supply a rom!");
+    }
+
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
 
@@ -46,33 +53,32 @@ fn main() -> Result<(), error::Error> {
         Pixels::new(128, 64, surface_texture)?
     };
 
-    let mut emu = Emulator::new(
+    let mut app = Application::new(
+        Emulator::new(INIT_SPEED, rom_path),
         Gui::new(&window, &pixels),
-        bus! {
-            Screen  [0x000..0x100],
-        },
-        CPU::default(),
-        10,
     );
 
     // set initial parameters
-    *emu.gui.menubar.settings.target_ipf() = emu.cpu.flags.monotonic.unwrap_or(10);
-    *emu.gui.menubar.settings.quirks() = emu.cpu.flags.quirks;
-    if let Some(path) = std::env::args().nth(1) {
-        emu.cpu.load_program(path)?;
-    } else {
-        panic!("Supply a rom!");
-    }
+    *app.gui.menubar.settings.target_ipf() = INIT_SPEED;
+    *app.gui.menubar.settings.quirks() = app.emu.quirks();
 
     // Run event loop
     event_loop.run(move |event, _, control_flow| {
+        let toggle_fullscreen = || {
+            window.set_fullscreen(if window.fullscreen().is_some() {
+                None
+            } else {
+                Some(winit::window::Fullscreen::Borderless(None))
+            })
+        };
+
         let redraw = |gui: &mut Gui, pixels: &mut Pixels| -> Result<(), error::Error> {
             // Prepare gui for redraw
             gui.prepare(&window)?;
 
             // Render everything together
             pixels.render_with(|encoder, render_target, context| {
-                // Render the world texture
+                // Render the emulator's screen
                 context.scaling_renderer.render(encoder, render_target);
                 // Render Dear ImGui
                 gui.render(&window, encoder, render_target, context)?;
@@ -81,7 +87,7 @@ fn main() -> Result<(), error::Error> {
             Ok(())
         };
 
-        let mut handle_events = |state: &mut Emulator,
+        let mut handle_events = |state: &mut Application,
                                  pixels: &mut Pixels,
                                  control_flow: &mut ControlFlow|
          -> Result<(), error::Error> {
@@ -89,29 +95,30 @@ fn main() -> Result<(), error::Error> {
             if input.update(&event) {
                 use VirtualKeyCode::*;
                 match_pressed!( match input {
-                    Escape | input.quit() | state.gui.wants_quit() => {
+                    Escape | input.quit() | state.gui.wants(Wants::Quit) => {
                         *control_flow = ControlFlow::Exit;
                         return Ok(());
                     },
-                    F1 => state.cpu.dump(),
-                    F2 => state.screen.print_screen()?,
-                    F3 => eprintln!("TODO: Dump screen"),
-                    F4 => state.cpu.flags.debug(),
-                    F5 => state.cpu.flags.pause(),
-                    F6 => state.cpu.singlestep(&mut state.screen)?,
-                    F7 => state.cpu.set_break(state.cpu.pc()),
-                    F8 => state.cpu.unset_break(state.cpu.pc()),
-                    Delete => state.cpu.reset(),
-                    F11 => window.set_maximized(!window.is_maximized()),
+                    F1 => state.emu.print_registers(),
+                    F2 => state.emu.print_screen()?,
+                    F3 => state.emu.dump_screen()?,
+                    F4 => state.emu.is_disasm(),
+                    F5 => state.emu.pause(),
+                    F6 => state.emu.singlestep()?,
+                    F7 => state.emu.set_break(),
+                    F8 => state.emu.unset_break(),
+                    Delete => state.emu.soft_reset(),
+                    Insert => state.emu.hard_reset(),
+                    F11 => toggle_fullscreen(),
                     LAlt => state.gui.show_menubar(None),
                 });
-                state.input(&input)?;
+                state.emu.input(&input)?;
 
                 // Apply settings
                 if let Some((ipf, quirks)) = state.gui.menubar.settings.applied() {
-                    state.ipf = ipf;
-                    state.cpu.flags.monotonic = Some(ipf);
-                    state.cpu.flags.quirks = quirks;
+                    state.emu.ipf = ipf;
+                    state.emu.set_quirks(quirks);
+                    println!("'A");
                 }
 
                 // Update the scale factor
@@ -130,14 +137,14 @@ fn main() -> Result<(), error::Error> {
                     }
                 }
 
-                state.cpu.flags.debug = state.gui.wants_disassembly();
-                if state.gui.wants_reset() {
-                    state.cpu.reset();
+                state.emu.set_disasm(state.gui.wants(Wants::Disasm));
+                if state.gui.wants(Wants::Reset) {
+                    state.emu.hard_reset();
                 }
 
                 // Run the game loop
-                state.update()?;
-                state.draw(pixels)?;
+                state.emu.update()?;
+                state.emu.draw(pixels)?;
 
                 // redraw the window
                 window.request_redraw();
@@ -146,81 +153,22 @@ fn main() -> Result<(), error::Error> {
         };
 
         if let Event::RedrawRequested(_) = event {
-            if let Err(e) = redraw(&mut emu.gui, &mut pixels) {
+            if let Err(e) = redraw(&mut app.gui, &mut pixels) {
                 eprintln!("{e}");
                 *control_flow = ControlFlow::Exit;
             }
         }
 
-        if let Err(e) = handle_events(&mut emu, &mut pixels, control_flow) {
+        if let Err(e) = handle_events(&mut app, &mut pixels, control_flow) {
             eprintln!("{e}");
             *control_flow = ControlFlow::Exit;
         }
     });
 }
 
-impl Emulator {
-    pub fn new(gui: Gui, mem: Bus, cpu: CPU, ipf: usize) -> Self {
-        Self {
-            gui,
-            screen: mem,
-            cpu,
-            ipf,
-            colors: [*FOREGROUND, *BACKGROUND],
-        }
-    }
-
-    pub fn update(&mut self) -> Result<(), error::Error> {
-        self.cpu.multistep(&mut self.screen, self.ipf)?;
-        Ok(())
-    }
-
-    pub fn draw(&mut self, pixels: &mut Pixels) -> Result<(), error::Error> {
-        if let Some(screen) = self.screen.get_region(Screen) {
-            let len_log2 = screen.len().ilog2() / 2;
-            #[allow(unused_variables)]
-            let (width, height) = (2u32.pow(len_log2 + 2), 2u32.pow(len_log2 + 1));
-            pixels.resize_buffer(width, height)?;
-            for (idx, pixel) in pixels.frame_mut().iter_mut().enumerate() {
-                let (byte, bit, component) = (idx >> 5, (idx >> 2) % 8, idx & 0b11);
-                *pixel = if screen[byte] & (0x80 >> bit) > 0 {
-                    self.colors[0][component]
-                } else {
-                    self.colors[1][component]
-                }
-            }
-        }
-        Ok(())
-    }
-
-    pub fn input(&mut self, input: &WinitInputHelper) -> Result<(), error::Error> {
-        const KEYMAP: [VirtualKeyCode; 16] = [
-            VirtualKeyCode::X,
-            VirtualKeyCode::Key1,
-            VirtualKeyCode::Key2,
-            VirtualKeyCode::Key3,
-            VirtualKeyCode::Q,
-            VirtualKeyCode::W,
-            VirtualKeyCode::E,
-            VirtualKeyCode::A,
-            VirtualKeyCode::S,
-            VirtualKeyCode::D,
-            VirtualKeyCode::Z,
-            VirtualKeyCode::C,
-            VirtualKeyCode::Key4,
-            VirtualKeyCode::R,
-            VirtualKeyCode::F,
-            VirtualKeyCode::V,
-        ];
-        for (id, &key) in KEYMAP.iter().enumerate() {
-            if input.key_released(key) {
-                self.cpu.release(id)?;
-            }
-            if input.key_pressed(key) {
-                self.cpu.press(id)?;
-            }
-        }
-        Ok(())
+impl Application {
+    fn new(emu: Emulator, gui: Gui) -> Self {
+        Self { gui, emu }
     }
 }
 

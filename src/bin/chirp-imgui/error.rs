@@ -3,7 +3,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub(crate) enum Error {
+pub enum Error {
     /// Error originated in [`chirp`]
     #[error(transparent)]
     Chirp(#[from] chirp::error::Error),

@@ -7,8 +7,15 @@
 use pixels::{wgpu, PixelsContext};
 use std::time::Instant;
 
+mod about;
 mod menubar;
 use menubar::Menubar;
+
+/// Lays out the imgui widgets for a thing
+pub trait Drawable {
+    // Lay out the ImGui widgets for this thing
+    fn draw(&mut self, ui: &imgui::Ui);
+}
 
 /// Holds state of GUI
 pub(crate) struct Gui {
@@ -18,6 +25,17 @@ pub(crate) struct Gui {
     last_frame: Instant,
     last_cursor: Option<imgui::MouseCursor>,
     pub menubar: Menubar,
+}
+
+/// Queries the state of the [Gui]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum Wants {
+    Quit,
+    Disasm,
+    SoftReset,
+    HardReset,
+    Reset,
 }
 
 impl std::fmt::Debug for Gui {
@@ -43,18 +61,18 @@ impl Gui {
         platform.attach_window(
             imgui.io_mut(),
             window,
-            imgui_winit_support::HiDpiMode::Default,
+            imgui_winit_support::HiDpiMode::Locked(2.2),
         );
 
         // Configure fonts
-        // let dpi_scale = window.scale_factor();
-        // let font_size = (13.0 * dpi_scale) as f32;
-        // imgui.io_mut().font_global_scale = (1.0 / dpi_scale) as f32;
+        let dpi_scale = window.scale_factor();
+        let font_size = (13.0 * dpi_scale) as f32;
+        imgui.io_mut().font_global_scale = (1.0 / dpi_scale) as f32;
         imgui
             .fonts()
             .add_font(&[imgui::FontSource::DefaultFontData {
                 config: Some(imgui::FontConfig {
-                    size_pixels: 13.0,
+                    size_pixels: font_size,
                     oversample_h: 2,
                     oversample_v: 2,
                     pixel_snap_h: true,
@@ -112,53 +130,12 @@ impl Gui {
             self.platform.prepare_render(ui, window);
         }
 
-        let menu = &mut self.menubar;
-        let settings_menu = || {
-            use chirp::Mode::*;
-            let settings = &mut menu.settings;
-            const MODES: [chirp::Mode; 3] = [Chip8, SChip, XOChip];
-            if ui.combo_simple_string("Mode", &mut settings.mode_index, &MODES) {
-                settings.quirks = MODES[settings.mode_index].into();
-                settings.applied = true;
-            }
-            settings.applied = {
-                ui.input_scalar("IPF", &mut settings.target_ipf)
-                    .chars_decimal(true)
-                    .build()
-                    | ui.checkbox("Bin-ops don't clear vF", &mut settings.quirks.bin_ops)
-                    | ui.checkbox("DMA doesn't modify I", &mut settings.quirks.dma_inc)
-                    | ui.checkbox("Draw calls are instant", &mut settings.quirks.draw_wait)
-                    | ui.checkbox("Screen wraps at edge", &mut settings.quirks.screen_wrap)
-                    | ui.checkbox("Shift ops ignore vY", &mut settings.quirks.shift)
-                    | ui.checkbox("Jumps behave eratically", &mut settings.quirks.stupid_jumps)
-            }
-        };
-        // let file_menu = || {
-        //     let file = &mut menu.file;
-        //     file.quit = ui.menu_item("Quit");
-        // };
-        let debug_menu = || {
-            menu.debug.reset = ui.menu_item("Reset");
-            ui.checkbox("Live Disassembly", &mut menu.debug.dis);
-        };
-        let help_menu = || {
-            let about = &mut menu.about;
-            about.open = ui.menu_item("About...");
-        };
-
+        self.menubar.draw(ui);
         // Draw windows and GUI elements here
-        if menu.active {
-            ui.main_menu_bar(|| {
-                //ui.menu("File", file_menu);
-                ui.menu("Settings", settings_menu);
-                ui.menu("Debug", debug_menu);
-                ui.menu("Help", help_menu);
-            });
-        }
 
-        if menu.file.settings {}
-        if self.menubar.about.open {
-            ui.show_about_window(&mut self.menubar.about.open);
+        if self.menubar.about.about_open {
+            ui.open_popup("About");
+            self.menubar.about.about_open = false;
         }
 
         // Render Dear ImGui with WGPU
@@ -201,17 +178,17 @@ impl Gui {
         }
     }
 
-    pub fn wants_reset(&mut self) -> bool {
-        let reset = self.menubar.debug.reset;
-        self.menubar.debug.reset = false;
-        reset
-    }
-
-    pub fn wants_disassembly(&self) -> bool {
-        self.menubar.debug.dis
-    }
-
-    pub fn wants_quit(&self) -> bool {
-        self.menubar.file.quit
+    /// Query the state of the Gui through a unified interface
+    pub fn wants(&mut self, wants: Wants) -> bool {
+        match wants {
+            Wants::Quit => self.menubar.file.quit,
+            Wants::Disasm => self.menubar.debug.dis,
+            Wants::Reset => {
+                let reset = self.menubar.debug.reset;
+                self.menubar.debug.reset = false;
+                reset
+            }
+            _ => unreachable!(),
+        }
     }
 }
