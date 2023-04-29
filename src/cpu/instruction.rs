@@ -137,7 +137,7 @@ pub enum Insn {
     /// | 00ff | Enter high-resolution mode
     #[opcode = "0x00ff"]
     hires,
-    /// | fx30 | Enter high-resolution mode
+    /// | fx30 | Load hires font address into vX
     #[opcode = "0xfx30"]
     hfont { x: usize },
     /// | fx75 | Save to "flag registers"

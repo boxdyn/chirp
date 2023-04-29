@@ -1149,7 +1149,7 @@ mod behavior {
     fn invalid_pc() {
         let (mut cpu, mut bus) = setup_environment();
         // The bus extends from 0x0..0x1000
-        cpu.pc = 0xfff;
+        cpu.pc = 0x1001;
         match cpu.tick(&mut bus) {
             Err(Error::InvalidAddressRange { range }) => {
                 eprintln!("InvalidAddressRange {{ {range:04x?} }}")
