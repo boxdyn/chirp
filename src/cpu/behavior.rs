@@ -407,10 +407,7 @@ impl CPU {
     pub(super) fn draw_sprite(&mut self, x: u16, y: u16, n: Nib, w: u16, h: u16, screen: &mut Bus) {
         let w_bytes = w / 8;
         self.v[0xf] = 0;
-        if let Some(sprite) = self
-            .screen
-            .get(self.i as usize..(self.i + n as u16) as usize)
-        {
+        if let Some(sprite) = self.mem.get(self.i as usize..(self.i + n as u16) as usize) {
             for (line, &sprite) in sprite.iter().enumerate() {
                 let line = line as u16;
                 let sprite = ((sprite as u16) << (8 - (x % 8))).to_be_bytes();
@@ -460,7 +457,7 @@ impl CPU {
     pub(super) fn draw_schip_sprite(&mut self, x: u16, y: u16, w: u16, screen: &mut Bus) {
         self.v[0xf] = 0;
         let w_bytes = w / 8;
-        if let Some(sprite) = self.screen.get(self.i as usize..(self.i + 32) as usize) {
+        if let Some(sprite) = self.mem.get(self.i as usize..(self.i + 32) as usize) {
             let sprite = sprite.to_owned();
             for (line, sprite) in sprite.chunks_exact(2).enumerate() {
                 let sprite = u16::from_be_bytes(
@@ -572,9 +569,9 @@ impl CPU {
     #[inline(always)]
     pub(super) fn bcd_convert(&mut self, x: Reg) {
         let x = self.v[x];
-        self.screen.write(self.i.wrapping_add(2), x % 10);
-        self.screen.write(self.i.wrapping_add(1), x / 10 % 10);
-        self.screen.write(self.i, x / 100 % 10);
+        self.mem.write(self.i.wrapping_add(2), x % 10);
+        self.mem.write(self.i.wrapping_add(1), x / 10 % 10);
+        self.mem.write(self.i, x / 100 % 10);
     }
     /// |`Fx55`| DMA Stor from I to registers 0..=X
     ///
@@ -585,7 +582,7 @@ impl CPU {
     pub(super) fn store_dma(&mut self, x: Reg) {
         let i = self.i as usize;
         for (reg, value) in self
-            .screen
+            .mem
             .get_mut(i..=i + x)
             .unwrap_or_default()
             .iter_mut()
@@ -606,7 +603,7 @@ impl CPU {
     pub(super) fn load_dma(&mut self, x: Reg) {
         let i = self.i as usize;
         for (reg, value) in self
-            .screen
+            .mem
             .get(i..=i + x)
             .unwrap_or_default()
             .iter()
@@ -642,7 +639,7 @@ impl CPU {
     pub(super) fn store_flags(&mut self, x: Reg) {
         // TODO: Save these, maybe
         for (reg, value) in self
-            .screen
+            .mem
             .get_mut(0..=x)
             .unwrap_or_default()
             .iter_mut()
@@ -656,13 +653,7 @@ impl CPU {
     /// I just chuck it in 0x0..0xf. Screw it.
     #[inline(always)]
     pub(super) fn load_flags(&mut self, x: Reg) {
-        for (reg, value) in self
-            .screen
-            .get(0..=x)
-            .unwrap_or_default()
-            .iter()
-            .enumerate()
-        {
+        for (reg, value) in self.mem.get(0..=x).unwrap_or_default().iter().enumerate() {
             self.v[reg] = *value;
         }
     }

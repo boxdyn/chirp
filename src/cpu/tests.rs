@@ -33,7 +33,7 @@ fn setup_environment() -> (CPU, Bus) {
         },
         bus! {
             // Create a screen
-            Screen  [0x0F00..0x1000] = include_bytes!("../../chip8Archive/roms/1dcell.ch8"),
+            Screen  [0x000..0x100] = include_bytes!("../../chip8Archive/roms/1dcell.ch8"),
         },
     );
     ch8.0
@@ -755,7 +755,7 @@ mod io {
                 // Debug mode is 5x slower
                 cpu.flags.debug = false;
                 // Load the test program
-                cpu.screen.load_region(Program, test.program).unwrap();
+                cpu.mem.load_region(Program, test.program).unwrap();
                 // Run the test program for the specified number of steps
                 while cpu.cycle() < test.steps {
                     cpu.multistep(&mut bus, 10.min(test.steps - cpu.cycle()))
@@ -958,7 +958,7 @@ mod io {
 
                 let addr = cpu.i as usize;
                 assert_eq!(
-                    cpu.screen
+                    cpu.mem
                         .get(addr..addr.wrapping_add(5))
                         .expect("Region at addr should exist!"),
                     test.output,
@@ -1004,10 +1004,7 @@ mod io {
 
                 cpu.bcd_convert(5);
 
-                assert_eq!(
-                    cpu.screen.get(addr..addr.saturating_add(3)),
-                    Some(test.output)
-                )
+                assert_eq!(cpu.mem.get(addr..addr.saturating_add(3)), Some(test.output))
             }
         }
     }
@@ -1030,7 +1027,7 @@ mod io {
             cpu.store_dma(len);
             // Check that bus grabbed the correct data
             let bus = cpu
-                .screen
+                .mem
                 .get_mut(addr..addr + DATA.len())
                 .expect("Getting a mutable slice at addr 0x0456 should not fail");
             assert_eq!(bus[0..=len], DATA[0..=len]);
@@ -1048,7 +1045,7 @@ mod io {
         const DATA: &[u8] = b"ABCDEFGHIJKLMNOP";
         // Load some test data into memory
         let addr = 0x456;
-        cpu.screen
+        cpu.mem
             .get_mut(addr..addr + DATA.len())
             .expect("Getting a mutable slice at addr 0x0456..0x0466 should not fail")
             .write_all(DATA)
@@ -1088,8 +1085,8 @@ mod behavior {
         #[test]
         fn sound() {
             let (mut cpu, mut bus) = setup_environment();
-            cpu.flags.monotonic = None; // disable monotonic timing
             cpu.sound = 10.0;
+            cpu.flags.monotonic = false; // disable monotonic timing
             for _ in 0..2 {
                 cpu.multistep(&mut bus, 8)
                     .expect("Running valid instructions should always succeed");

@@ -43,7 +43,7 @@ pub struct CPU {
     /// chip-8. Includes [Quirks], target IPF, etc.
     pub flags: Flags,
     // memory map info
-    screen: Bus,
+    mem: Bus,
     font: Adr,
     // memory
     stack: Vec<Adr>,
@@ -108,9 +108,24 @@ impl CPU {
 
     /// Loads bytes into the CPU's program space
     pub fn load_program_bytes(&mut self, rom: &[u8]) -> Result<&mut Self> {
-        self.screen.clear_region(Program);
-        self.screen.load_region(Program, rom)?;
+        self.mem.clear_region(Program);
+        self.mem.load_region(Program, rom)?;
         Ok(self)
+    }
+
+    /// Pokes a value into memory
+    pub fn poke(&mut self, addr: Adr, data: u8) {
+        self.mem.write(addr, data)
+    }
+
+    /// Peeks a value from memory
+    pub fn peek(&mut self, addr: Adr) -> u8 {
+        self.mem.read(addr)
+    }
+
+    /// Grabs a reference to the [CPU]'s memory
+    pub fn introspect(&mut self) -> &Bus {
+        &self.mem
     }
 
     /// Presses a key, and reports whether the key's state changed.  
@@ -453,12 +468,12 @@ impl CPU {
     /// # cpu.flags.debug = true;        // enable live disassembly
     /// # cpu.flags.monotonic = true; // enable monotonic/test timing
     /// let mut bus = bus!{
-    ///     Program [0x0200..0x0f00] = &[
-    ///         0xff, 0xff, // invalid!
-    ///         0x22, 0x02, // jump 0x202 (pc)
-    ///     ],
     ///     Screen  [0x0f00..0x1000],
     /// };
+    /// cpu.load_program_bytes(&[
+    ///     0xff, 0xff, // invalid!
+    ///     0x22, 0x02, // jump 0x202
+    /// ]);
     /// dbg!(cpu.tick(&mut bus))
     ///     .expect_err("Should return Error::InvalidInstruction { 0xffff }");
     /// ```
@@ -472,23 +487,13 @@ impl CPU {
             return Ok(self);
         }
         self.cycle += 1;
+        // Fetch slice of memory starting at pc, for var-width opcode 0xf000_iiii
         let opchunk = self
-            .screen
+            .mem
             .get(self.pc as usize..)
             .ok_or(Error::InvalidAddressRange {
                 range: (self.pc as usize..).into(),
             })?;
-        // fetch opcode
-        let opcode: &[u8; 2] =
-            if let Some(slice) = self.screen.get(self.pc as usize..self.pc as usize + 2) {
-                slice
-                    .try_into()
-                    .expect("`slice` should be exactly 4 bytes.")
-            } else {
-                return Err(Error::InvalidAddressRange {
-                    range: (self.pc as usize..self.pc as usize + 4).into(),
-                });
-            };
 
         // Print opcode disassembly:
         if self.flags.debug {
@@ -496,7 +501,7 @@ impl CPU {
                 "{:3} {:03x}: {:<36}",
                 self.cycle.bright_black(),
                 self.pc,
-                self.disassembler.once(u16::from_be_bytes(*opcode))
+                self.disassembler.once(self.mem.read(self.pc))
             );
         }
 
@@ -506,7 +511,7 @@ impl CPU {
             self.execute(screen, insn);
         } else {
             return Err(Error::UnimplementedInstruction {
-                word: u16::from_be_bytes(*opcode),
+                word: self.mem.read(self.pc),
             });
         }
 
@@ -515,7 +520,7 @@ impl CPU {
             self.flags.pause = true;
             return Err(Error::BreakpointHit {
                 addr: self.pc,
-                next: self.screen.read(self.pc),
+                next: self.mem.read(self.pc),
             });
         }
         Ok(self)
@@ -600,7 +605,7 @@ impl Default for CPU {
     fn default() -> Self {
         CPU {
             stack: vec![],
-            screen: bus! {
+            mem: bus! {
                 Charset [0x0050..0x00a0] = include_bytes!("mem/charset.bin"),
                 Program [0x0200..0x1000],
             },

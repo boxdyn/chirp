@@ -15,7 +15,7 @@ fn run_single_op(op: &[u8]) -> CPU {
             Screen[0x0..0x1000],
         },
     );
-    cpu.screen
+    cpu.mem
         .load_region(Program, op).unwrap();
     cpu.v = *INDX;
     cpu.flags.quirks = Quirks::from(false);
