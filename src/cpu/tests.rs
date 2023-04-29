@@ -51,41 +51,42 @@ fn print_screen(bytes: &[u8]) {
 /// Unused instructions
 mod unimplemented {
     use super::*;
-    #[test]
-    fn ins_5xyn() {
-        let (mut cpu, mut bus) = setup_environment();
-        cpu.screen.write(0x200u16, 0x500fu16);
-        cpu.tick(&mut bus)
-            .expect_err("0x500f is not an instruction");
+    macro_rules! invalid {
+        ($(
+            $(#[$attr:meta])*      // Preserve doc comments, etc.
+            $pub:vis test $name:ident { $($insn:literal),+$(,)? }
+        );+ $(;)?) => {
+            $( $(#[$attr])* #[test] $pub fn $name () {$(
+                let (mut cpu, mut bus) = setup_environment();
+                cpu.mem.write(0x200u16, $insn as u16);
+                cpu.tick(&mut bus)
+                    .expect_err(stringify!($insn is not an instruction));
+            )*} )+
+        };
     }
-    #[test]
-    fn ins_8xyn() {
-        let (mut cpu, mut bus) = setup_environment();
-        cpu.screen.write(0x200u16, 0x800fu16);
-        cpu.tick(&mut bus)
-            .expect_err("0x800f is not an instruction");
-    }
-    #[test]
-    fn ins_9xyn() {
-        let (mut cpu, mut bus) = setup_environment();
-        cpu.screen.write(0x200u16, 0x900fu16);
-        cpu.tick(&mut bus)
-            .expect_err("0x900f is not an instruction");
-    }
-    #[test]
-    fn ins_exbb() {
-        let (mut cpu, mut bus) = setup_environment();
-        cpu.screen.write(0x200u16, 0xe00fu16);
-        cpu.tick(&mut bus)
-            .expect_err("0xe00f is not an instruction");
-    }
-    // Fxbb
-    #[test]
-    fn ins_fxbb() {
-        let (mut cpu, mut bus) = setup_environment();
-        cpu.screen.write(0x200u16, 0xf00fu16);
-        cpu.tick(&mut bus)
-            .expect_err("0xf00f is not an instruction");
+
+    invalid! {
+        /// Invalid opcodes 5001, 0x5004-500f
+        test ins_5xyn {
+            0x5001,
+            0x5004, 0x5005, 0x5006, 0x5007, 0x5008, 0x5009,
+            0x500a, 0x500b, 0x500c, 0x500d, 0x500e, 0x500f,
+        };
+        /// Invalid opcodes 8008-800d and 800f
+        test ins_8xyn {
+            0x8008, 0x8009, 0x800a, 0x800b, 0x800c, 0x800d,
+            0x800f,
+        };
+        /// Invalid opcodes 9001-900f
+        test ins_9xyn {
+            0x9001, 0x9002, 0x9003, 0x9004, 0x9005,
+            0x9006, 0x9007, 0x9008, 0x9009, 0x900a,
+            0x900b, 0x900c, 0x900d, 0x900e, 0x900f,
+        };
+        /// Invalid opcodes in e000 range
+        test ins_exbb { 0xe00f };
+        /// Invalid opcodes in the 0xf000 range
+        test ins_fxbb { 0xf001, 0xf00f };
     }
 }
 
