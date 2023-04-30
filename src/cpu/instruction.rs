@@ -1,7 +1,8 @@
 // (c) 2023 John A. Breaux
 // This code is licensed under MIT license (see LICENSE for details)
-#![allow(clippy::bad_bit_mask)]
+
 //! Contains the definition of a Chip-8 [Insn]
+#![allow(clippy::bad_bit_mask)]
 
 pub mod disassembler;
 
@@ -12,7 +13,7 @@ use std::fmt::Display;
 #[allow(non_camel_case_types, non_snake_case, missing_docs)]
 #[derive(Clone, Copy, Debug, InstructionSet, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-/// Implements a Disassembler using imperative_rs
+/// Represents a Chip-8 Instruction
 pub enum Insn {
     // Base instruction set
     /// | 00e0 | Clear screen memory to 0s
