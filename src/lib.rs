@@ -22,13 +22,5 @@ pub use cpu::{
     CPU,
 };
 pub use error::{Error, Result};
-/// Holds the state of a Chip-8
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Chip8 {
-    /// Contains the registers, flags, and operating state for a single Chip-8
-    pub cpu: cpu::CPU,
-    /// Contains the memory of a chip-8
-    pub bus: cpu::bus::Bus,
-}
 pub use screen::Screen;
 pub use traits::{AutoCast, FallibleAutoCast, Grab};
