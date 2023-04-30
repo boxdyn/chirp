@@ -3,14 +3,15 @@
 
 //! Contains implementations for each Chip-8 [Insn]
 
-use super::{bus::Region, *};
+use super::*;
+use crate::traits::Grab;
 use rand::random;
 
 impl CPU {
     /// Executes a single [Insn]
     #[rustfmt::skip]
     #[inline(always)]
-    pub(super) fn execute(&mut self, screen: &mut Bus, instruction: Insn) {
+    pub(super) fn execute(&mut self, screen: &mut Screen, instruction: Insn) {
         match instruction {
             // Core Chip-8 instructions
             Insn::cls               => self.clear_screen(screen),
@@ -73,8 +74,8 @@ impl CPU {
     /// |`00e0`| Clears the screen memory to 0
     /// Corresponds to [Insn::cls]
     #[inline(always)]
-    pub(super) fn clear_screen(&mut self, bus: &mut Bus) {
-        bus.clear_region(Region::Screen);
+    pub(super) fn clear_screen(&mut self, screen: &mut Screen) {
+        screen.clear()
     }
     /// |`00ee`| Returns from subroutine
     /// Corresponds to [Insn::ret]
@@ -99,7 +100,7 @@ impl CPU {
     ///
     /// Corresponds to [Insn::scd]
     #[inline(always)]
-    pub(super) fn scroll_down(&mut self, n: Nib, screen: &mut Bus) {
+    pub(super) fn scroll_down(&mut self, n: Nib, screen: &mut Screen) {
         match self.flags.draw_mode {
             true => {
                 // Get a line from the bus
@@ -148,18 +149,18 @@ impl CPU {
     /// Initialize lores mode
     ///
     /// Corresponds to [Insn::lores]
-    pub(super) fn init_lores(&mut self, screen: &mut Bus) {
+    pub(super) fn init_lores(&mut self, screen: &mut Screen) {
         self.flags.draw_mode = false;
-        screen.set_region(Region::Screen, 0..256);
+        screen.with_size(256);
         self.clear_screen(screen);
     }
     /// # |`00ff`|
     /// Initialize hires mode
     ///
     /// Corresponds to [Insn::hires]
-    pub(super) fn init_hires(&mut self, screen: &mut Bus) {
+    pub(super) fn init_hires(&mut self, screen: &mut Screen) {
         self.flags.draw_mode = true;
-        screen.set_region(Region::Screen, 0..1024);
+        screen.with_size(1024);
         self.clear_screen(screen);
     }
 }
@@ -439,7 +440,7 @@ impl CPU {
     /// # Quirk
     /// On the original chip-8 interpreter, this will wait for a VBI
     #[inline(always)]
-    pub(super) fn draw(&mut self, x: Reg, y: Reg, n: Nib, screen: &mut Bus) {
+    pub(super) fn draw(&mut self, x: Reg, y: Reg, n: Nib, screen: &mut Screen) {
         if !self.flags.quirks.draw_wait {
             self.flags.draw_wait = true;
         }
@@ -453,12 +454,20 @@ impl CPU {
 
     /// |`Dxyn`| Chip-8: Draws n-byte sprite to the screen at coordinates (vX, vY)
     #[inline(always)]
-    pub(super) fn draw_lores(&mut self, x: Reg, y: Reg, n: Nib, scr: &mut Bus) {
+    pub(super) fn draw_lores(&mut self, x: Reg, y: Reg, n: Nib, scr: &mut Screen) {
         self.draw_sprite(self.v[x] as u16 % 64, self.v[y] as u16 % 32, n, 64, 32, scr);
     }
 
     #[inline(always)]
-    pub(super) fn draw_sprite(&mut self, x: u16, y: u16, n: Nib, w: u16, h: u16, screen: &mut Bus) {
+    pub(super) fn draw_sprite(
+        &mut self,
+        x: u16,
+        y: u16,
+        n: Nib,
+        w: u16,
+        h: u16,
+        screen: &mut Screen,
+    ) {
         let w_bytes = w / 8;
         self.v[0xf] = 0;
         if let Some(sprite) = self.mem.grab(self.i as usize..(self.i + n as u16) as usize) {
@@ -492,7 +501,7 @@ impl CPU {
 impl CPU {
     /// |`Dxyn`| Super-Chip extension high-resolution graphics mode
     #[inline(always)]
-    pub(super) fn draw_hires(&mut self, x: Reg, y: Reg, n: Nib, screen: &mut Bus) {
+    pub(super) fn draw_hires(&mut self, x: Reg, y: Reg, n: Nib, screen: &mut Screen) {
         if !self.flags.quirks.draw_wait {
             self.flags.draw_wait = true;
         }
@@ -508,7 +517,7 @@ impl CPU {
     }
     /// Draws a 16x16 Super Chip sprite
     #[inline(always)]
-    pub(super) fn draw_schip_sprite(&mut self, x: u16, y: u16, w: u16, screen: &mut Bus) {
+    pub(super) fn draw_schip_sprite(&mut self, x: u16, y: u16, w: u16, screen: &mut Screen) {
         self.v[0xf] = 0;
         let w_bytes = w / 8;
         if let Some(sprite) = self.mem.grab(self.i as usize..(self.i + 32) as usize) {

@@ -7,26 +7,27 @@
 mod tests;
 
 mod behavior;
-pub mod bus;
 pub mod flags;
 pub mod instruction;
+#[macro_use]
+pub mod mem;
 pub mod mode;
 pub mod quirks;
 
 use self::{
-    bus::{Bus, Region::*},
     flags::Flags,
     instruction::{
         disassembler::{Dis, Disassembler},
         Insn,
     },
+    mem::{Mem, Region::*},
     mode::Mode,
     quirks::Quirks,
 };
 use crate::{
-    bus,
     error::{Error, Result},
-    traits::auto_cast::{AutoCast, Grab},
+    screen::Screen,
+    traits::{AutoCast, Grab},
 };
 use imperative_rs::InstructionSet;
 use owo_colors::OwoColorize;
@@ -44,7 +45,7 @@ pub struct CPU {
     /// chip-8. Includes [Quirks], target IPF, etc.
     pub flags: Flags,
     // memory map info
-    mem: Bus,
+    mem: Mem,
     font: Adr,
     // memory
     stack: Vec<Adr>,
@@ -90,7 +91,7 @@ impl CPU {
         flags: Flags,
     ) -> Result<Self> {
         const CHARSET: &[u8] = include_bytes!("mem/charset.bin");
-        let mem = bus! {
+        let mem = mem! {
             Charset [font as usize..font as usize + CHARSET.len()] = CHARSET,
             Program [pc as usize..0x1000],
         };
@@ -133,7 +134,7 @@ impl CPU {
     }
 
     /// Grabs a reference to the [CPU]'s memory
-    pub fn introspect(&mut self) -> &Bus {
+    pub fn introspect(&mut self) -> &Mem {
         &self.mem
     }
 
@@ -398,7 +399,7 @@ impl CPU {
     /// ```rust
     /// # use chirp::*;
     /// let mut cpu = CPU::default();
-    /// let mut screen = bus!{
+    /// let mut screen = mem!{
     ///     Screen  [0x000..0x100],
     /// };
     /// cpu.load_program_bytes(&[0x00, 0xe0, 0x22, 0x02]);
@@ -406,7 +407,7 @@ impl CPU {
     /// assert_eq!(0x202, cpu.pc());
     /// assert_eq!(1, cpu.cycle());
     /// ```
-    pub fn singlestep(&mut self, bus: &mut Bus) -> Result<&mut Self> {
+    pub fn singlestep(&mut self, bus: &mut Screen) -> Result<&mut Self> {
         self.flags.pause = false;
         self.tick(bus)?;
         self.flags.draw_wait = false;
@@ -421,7 +422,7 @@ impl CPU {
     /// ```rust
     /// # use chirp::*;
     /// let mut cpu = CPU::default();
-    /// let mut screen = bus!{
+    /// let mut screen = mem!{
     ///     Screen  [0x000..0x100],
     /// };
     /// cpu.load_program_bytes(&[0x00, 0xe0, 0x22, 0x02]);
@@ -430,7 +431,7 @@ impl CPU {
     /// assert_eq!(0x202, cpu.pc());
     /// assert_eq!(0x20, cpu.cycle());
     /// ```
-    pub fn multistep(&mut self, screen: &mut Bus, steps: usize) -> Result<&mut Self> {
+    pub fn multistep(&mut self, screen: &mut Screen, steps: usize) -> Result<&mut Self> {
         //let speed = 1.0 / steps as f64;
         for _ in 0..steps {
             self.tick(screen)?;
@@ -447,22 +448,21 @@ impl CPU {
     /// This result contains information about the breakpoint, but can be safely ignored.
     ///
     /// Returns [Error::UnimplementedInstruction] if the instruction at `pc` is unimplemented.
+    ///
     /// # Examples
     /// ```rust
     /// # use chirp::*;
     /// let mut cpu = CPU::default();
-    /// let mut bus = bus!{
-    ///     Program [0x0200..0x0f00] = &[
-    ///         0x00, 0xe0, // cls
-    ///         0x22, 0x02, // jump 0x202 (pc)
-    ///     ],
-    ///     Screen  [0x0f00..0x1000],
+    /// let mut bus = mem!{
+    ///     Screen  [0x000..0x100],
     /// };
+    /// cpu.load_program_bytes(&[0x00, 0xe0, 0x22, 0x02]);
     /// cpu.tick(&mut bus)
     ///     .expect("0x00e0 (cls) should be a valid opcode.");
     /// assert_eq!(0x202, cpu.pc());
     /// assert_eq!(1, cpu.cycle());
     /// ```
+
     /// Returns [Error::UnimplementedInstruction] if the instruction is not implemented.
     /// ```rust
     /// # use chirp::*;
@@ -470,7 +470,7 @@ impl CPU {
     /// let mut cpu = CPU::default();
     /// # cpu.flags.debug = true;        // enable live disassembly
     /// # cpu.flags.monotonic = true; // enable monotonic/test timing
-    /// let mut bus = bus!{
+    /// let mut bus = mem!{
     ///     Screen  [0x0f00..0x1000],
     /// };
     /// cpu.load_program_bytes(&[
@@ -480,7 +480,7 @@ impl CPU {
     /// dbg!(cpu.tick(&mut bus))
     ///     .expect_err("Should return Error::InvalidInstruction { 0xffff }");
     /// ```
-    pub fn tick(&mut self, screen: &mut Bus) -> Result<&mut Self> {
+    pub fn tick(&mut self, screen: &mut Screen) -> Result<&mut Self> {
         // Do nothing if paused
         if self.flags.is_paused() {
             // always tick in test mode
@@ -608,7 +608,7 @@ impl Default for CPU {
     fn default() -> Self {
         CPU {
             stack: vec![],
-            mem: bus! {
+            mem: mem! {
                 Charset [0x0050..0x00a0] = include_bytes!("mem/charset.bin"),
                 Program [0x0200..0x1000],
             },

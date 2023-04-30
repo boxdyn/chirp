@@ -10,11 +10,11 @@
 
 pub mod cpu;
 pub mod error;
+pub mod screen;
 pub mod traits;
 
 // Common imports for Chirp
 pub use cpu::{
-    bus::{Bus, Region::*},
     flags::Flags,
     instruction::disassembler::{Dis, Disassembler},
     mode::Mode,
@@ -22,8 +22,6 @@ pub use cpu::{
     CPU,
 };
 pub use error::{Error, Result};
-pub use traits::auto_cast::{AutoCast, Grab};
-
 /// Holds the state of a Chip-8
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Chip8 {
@@ -32,3 +30,5 @@ pub struct Chip8 {
     /// Contains the memory of a chip-8
     pub bus: cpu::bus::Bus,
 }
+pub use screen::Screen;
+pub use traits::{AutoCast, FallibleAutoCast, Grab};

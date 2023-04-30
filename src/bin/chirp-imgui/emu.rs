@@ -1,7 +1,7 @@
 //! The emulator's state, including the screen data
 
 use super::{error, BACKGROUND, FOREGROUND};
-use chirp::{bus, Bus, Screen, CPU};
+use chirp::{Grab, Screen, CPU};
 use pixels::Pixels;
 use std::path::{Path, PathBuf};
 use winit::event::VirtualKeyCode;
@@ -10,7 +10,7 @@ use winit_input_helper::WinitInputHelper;
 /// The state of the application
 #[derive(Debug)]
 pub struct Emulator {
-    screen: Bus,
+    screen: Screen,
     cpu: CPU,
     pub ipf: usize,
     pub rom: PathBuf,
@@ -23,9 +23,7 @@ impl Emulator {
     /// # Panics
     /// Panics if the provided ROM does not exist
     pub fn new(ipf: usize, rom: impl AsRef<Path>) -> Self {
-        let screen = bus! {
-            Screen  [0x000..0x100],
-        };
+        let screen = Screen::default();
         let mut cpu = CPU::default();
         cpu.load_program(&rom).expect("Loaded file MUST exist.");
         Self {
@@ -43,7 +41,7 @@ impl Emulator {
     }
     /// Rasterizes the screen into a [Pixels] buffer
     pub fn draw(&mut self, pixels: &mut Pixels) -> Result<(), error::Error> {
-        if let Some(screen) = self.screen.get_region(Screen) {
+        if let Some(screen) = self.screen.grab(..) {
             let len_log2 = screen.len().ilog2() / 2;
             #[allow(unused_variables)]
             let (width, height) = (2u32.pow(len_log2 + 2), 2u32.pow(len_log2 + 1));
@@ -102,7 +100,7 @@ impl Emulator {
     }
     /// Prints the screen (using the highest resolution available printer) to stdout
     pub fn print_screen(&self) -> Result<(), error::Error> {
-        self.screen.print_screen()?;
+        self.screen.print_screen();
         Ok(())
     }
     /// Dumps the raw screen bytes to a file named `{rom}_{cycle}.bin`,
@@ -114,23 +112,9 @@ impl Emulator {
             self.cpu.cycle()
         ));
         path.set_extension("bin");
-        if std::fs::write(
-            &path,
-            self.screen
-                .get_region(Screen)
-                .expect("Region::Screen should exist"),
-        )
-        .is_ok()
-        {
+        if std::fs::write(&path, self.screen.as_slice()).is_ok() {
             eprintln!("Saved to {}", &path.display());
-        } else if std::fs::write(
-            "screen_dump.bin",
-            self.screen
-                .get_region(Screen)
-                .expect("Region::Screen should exist"),
-        )
-        .is_ok()
-        {
+        } else if std::fs::write("screen_dump.bin", self.screen.as_slice()).is_ok() {
             eprintln!("Saved to screen_dump.bin");
         } else {
             eprintln!("Failed to dump screen to file.")
@@ -171,14 +155,14 @@ impl Emulator {
     /// Soft-resets the CPU, keeping the program in memory
     pub fn soft_reset(&mut self) {
         self.cpu.reset();
-        self.screen.clear_region(Screen);
+        self.screen.clear();
         eprintln!("Soft Reset");
     }
 
     /// Creates a new CPU with the current CPU's flags
     pub fn hard_reset(&mut self) {
         self.cpu.reset();
-        self.screen.clear_region(Screen);
+        self.screen.clear();
         // keep the flags
         let flags = self.cpu.flags.clone();
         // instantiate a completely new CPU, and reload the ROM from disk

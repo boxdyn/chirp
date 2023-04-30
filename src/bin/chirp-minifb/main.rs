@@ -12,7 +12,6 @@ use chirp::error::Error::BreakpointHit;
 use chirp::{error::Result, *};
 use gumdrop::*;
 use owo_colors::OwoColorize;
-use std::fs::read;
 use std::{
     path::PathBuf,
     time::{Duration, Instant},
@@ -109,6 +108,11 @@ struct Arguments {
 }
 
 #[derive(Debug)]
+pub struct Chip8 {
+    pub cpu: CPU,
+    pub screen: Screen,
+}
+#[derive(Debug)]
 struct State {
     pub speed: usize,
     pub step: Option<usize>,
@@ -127,16 +131,8 @@ impl State {
             rate: options.frame_rate,
             perf: options.perf,
             ch8: Chip8 {
-                bus: bus! {
-                    // Load the charset into ROM
-                    Charset [0x0050..0x00A0] = include_bytes!("../../mem/charset.bin"),
-                    // Load the ROM file into RAM
-                    Program [0x0200..0x1000] = &read(&options.file)?,
-                    // Create a screen
-                    Screen  [0x1000..0x1100],
-                },
                 cpu: CPU::new(
-                    &options.file,
+                    Some(&options.file),
                     0x50,
                     0x200,
                     Dis::default(),
@@ -148,6 +144,7 @@ impl State {
                         ..Default::default()
                     },
                 )?,
+                screen: Screen::default(),
             },
             ui: UIBuilder::new(128, 64, &options.file).build()?,
             ft: Instant::now(),
@@ -158,7 +155,7 @@ impl State {
         state.ch8.cpu.flags.quirks.draw_wait ^= options.drawsync;
         state.ch8.cpu.flags.quirks.shift ^= options.shift;
         state.ch8.cpu.flags.quirks.stupid_jumps ^= options.jumping;
-        state.ch8.bus.write(0x1feu16, options.data);
+        state.ch8.screen.write(0x1feu16, options.data);
         Ok(state)
     }
     fn keys(&mut self) -> Result<bool> {
@@ -173,7 +170,7 @@ impl State {
             match self.step {
                 Some(ticks) => {
                     let time = Instant::now();
-                    self.ch8.cpu.multistep(&mut self.ch8.bus, ticks)?;
+                    self.ch8.cpu.multistep(&mut self.ch8.screen, ticks)?;
                     if self.perf {
                         let time = time.elapsed();
                         let nspt = time.as_secs_f64() / ticks as f64;
@@ -186,7 +183,7 @@ impl State {
                     }
                 }
                 None => {
-                    self.ch8.cpu.multistep(&mut self.ch8.bus, rate)?;
+                    self.ch8.cpu.multistep(&mut self.ch8.screen, rate)?;
                 }
             }
         }
@@ -195,7 +192,7 @@ impl State {
     fn wait_for_next_frame(&mut self) {
         let rate = Duration::from_nanos(1_000_000_000 / self.rate + 1);
         std::thread::sleep(rate.saturating_sub(self.ft.elapsed()));
-        self.ft = self.ft + rate;
+        self.ft += rate;
     }
 }
 

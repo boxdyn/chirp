@@ -1,52 +1,45 @@
 //! Testing methods on Chirp's public API
+use chirp::cpu::mem::Region::*;
 use chirp::*;
 use std::{collections::hash_map::DefaultHasher, hash::Hash};
-
-#[test]
-#[allow(clippy::redundant_clone)]
-fn chip8() {
-    let ch8 = Chip8::default(); // Default
-    let ch82 = ch8.clone(); // Clone
-    assert_eq!(ch8, ch82); // PartialEq
-    println!("{ch8:?}"); // Debug
-}
 
 mod bus {
     use super::*;
     mod region {
+
         use super::*;
         //  #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
         #[test]
         fn copy() {
-            let r1 = Screen;
+            let r1 = Charset;
             let r2 = r1;
             assert_eq!(r1, r2);
         }
         #[test]
         #[allow(clippy::clone_on_copy)]
         fn clone() {
-            let r1 = Screen;
+            let r1 = Charset;
             let r2 = r1.clone();
             assert_eq!(r1, r2);
         }
         #[test]
         fn display() {
-            println!("{Charset}{Program}{Screen}{Count}");
+            println!("{Charset}{Program}{Count}");
         }
         #[test]
         fn debug() {
-            println!("{Charset:?}{Program:?}{Screen:?}{Count:?}");
+            println!("{Charset:?}{Program:?}{Count:?}");
         }
         // lmao the things you do for test coverage
         #[test]
         fn eq() {
-            assert_eq!(Screen, Screen);
+            assert_eq!(Charset, Charset);
             assert_ne!(Charset, Program);
         }
         #[test]
         fn ord() {
-            assert_eq!(Screen, Charset.max(Program).max(Screen));
-            assert!(Charset < Program && Program < Screen);
+            assert_eq!(Program, Charset.max(Program));
+            assert!(Charset < Program);
         }
         #[test]
         fn hash() {
@@ -59,7 +52,7 @@ mod bus {
     #[should_panic]
     fn bus_missing_region() {
         // Print the screen of a bus with no screen
-        bus! {}.print_screen().unwrap()
+        mem! {}.get_region(Charset).unwrap();
     }
 }
 
@@ -208,7 +201,7 @@ mod dis {
 
 #[test]
 fn error() {
-    let error = chirp::error::Error::MissingRegion { region: Screen };
+    let error = chirp::error::Error::InvalidAddressRange { range: (..).into() };
     // Print it with Display and Debug
     println!("{error} {error:?}");
 }

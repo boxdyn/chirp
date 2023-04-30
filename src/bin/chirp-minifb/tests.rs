@@ -1,6 +1,8 @@
 //! Tests for chirp-minifb
+#![allow(clippy::redundant_clone)]
 
 use super::ui::*;
+use super::Chip8;
 use chirp::*;
 use std::{collections::hash_map::DefaultHasher, hash::Hash};
 
@@ -29,7 +31,7 @@ mod ui {
     fn new_chip8() -> Chip8 {
         Chip8 {
             cpu: CPU::default(),
-            bus: bus! {},
+            screen: Screen::default(),
         }
     }
     #[test]

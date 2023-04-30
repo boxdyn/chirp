@@ -6,7 +6,7 @@
 pub mod any_range;
 use any_range::AnyRange;
 
-use crate::cpu::bus::Region;
+use crate::cpu::mem::Region;
 use thiserror::Error;
 
 /// Result type, equivalent to [std::result::Result]<T, [enum@Error]>

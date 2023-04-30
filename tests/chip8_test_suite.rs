@@ -6,20 +6,14 @@
 
 pub use chirp::*;
 
-fn setup_environment() -> (CPU, Bus) {
+fn setup_environment() -> (CPU, Screen) {
     let mut cpu = CPU::default();
     cpu.flags = Flags {
         debug: true,
         pause: false,
         ..Default::default()
     };
-    (
-        cpu,
-        bus! {
-            // Create a screen, and fill it with garbage
-            Screen  [0x000..0x100] = b"jsuadhgufywegrwsdyfogbbg4owgbrt",
-        },
-    )
+    (cpu, Screen::default())
 }
 
 struct SuiteTest {
@@ -28,23 +22,21 @@ struct SuiteTest {
     screen: &'static [u8],
 }
 
-fn run_screentest(test: SuiteTest, mut cpu: CPU, mut bus: Bus) {
+fn run_screentest(test: SuiteTest, mut cpu: CPU, mut screen: Screen) {
     // Set the test to run
     cpu.poke(0x1ffu16, test.test);
     cpu.load_program_bytes(test.data).unwrap();
     // The test suite always initiates a keypause on test completion
     while !(cpu.flags.is_paused()) {
-        cpu.multistep(&mut bus, 10).unwrap();
+        cpu.multistep(&mut screen, 10).unwrap();
         if cpu.cycle() > 1000000 {
             panic!("test {} took too long", test.test)
         }
     }
     // Compare the screen to the reference screen buffer
-    bus.print_screen().unwrap();
-    bus! {crate::cpu::bus::Region::Screen [0..256] = test.screen}
-        .print_screen()
-        .unwrap();
-    assert_eq!(bus.get_region(Screen).unwrap(), test.screen);
+    screen.print_screen();
+    Screen::from(test.screen).print_screen();
+    assert_eq!(screen.grab(..).unwrap(), test.screen);
 }
 
 #[test]

@@ -8,7 +8,6 @@ mod gui;
 
 use crate::emu::*;
 use crate::gui::*;
-use core::panic;
 use pixels::{Pixels, SurfaceTexture};
 use std::result::Result;
 use winit::dpi::LogicalSize;

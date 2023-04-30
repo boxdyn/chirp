@@ -4,17 +4,13 @@
 //! Platform-specific IO/UI code, and some debug functionality.
 //! TODO: Destroy this all.
 
+use super::Chip8;
+use chirp::{error::Result, screen::Screen};
+use minifb::*;
 use std::{
     path::{Path, PathBuf},
     time::Instant,
 };
-
-use chirp::{
-    cpu::bus::{Bus, Region},
-    error::Result,
-    Chip8,
-};
-use minifb::*;
 
 #[derive(Clone, Debug)]
 pub struct UIBuilder {
@@ -105,27 +101,25 @@ impl FrameBuffer {
             format: Default::default(),
         }
     }
-    pub fn render(&mut self, window: &mut Window, bus: &Bus) -> Result<()> {
-        if let Some(screen) = bus.get_region(Region::Screen) {
-            // Resizing the buffer does not unmap memory.
-            // After the first use of high-res mode, this is pretty cheap
-            (self.width, self.height) = match screen.len() {
-                256 => (64, 32),
-                1024 => (128, 64),
-                _ => {
-                    unimplemented!("Screen must be 64*32 or 128*64");
-                }
-            };
-            self.buffer.resize(self.width * self.height, 0);
-            for (idx, byte) in screen.iter().enumerate() {
-                for bit in 0..8 {
-                    self.buffer[8 * idx + bit] = if byte & (1 << (7 - bit)) as u8 != 0 {
-                        self.format.fg
-                    } else {
-                        self.format.bg
-                        // .wrapping_add(0x001104 * (idx / self.width) as u32)
-                        // .wrapping_add(0x141000 * (idx & 3) as u32)
-                    }
+    pub fn render(&mut self, window: &mut Window, screen: &Screen) -> Result<()> {
+        // Resizing the buffer does not unmap memory.
+        // After the first use of high-res mode, this is pretty cheap
+        (self.width, self.height) = match screen.len() {
+            256 => (64, 32),
+            1024 => (128, 64),
+            _ => {
+                unimplemented!("Screen must be 64*32 or 128*64");
+            }
+        };
+        self.buffer.resize(self.width * self.height, 0);
+        for (idx, byte) in screen.as_slice().iter().enumerate() {
+            for bit in 0..8 {
+                self.buffer[8 * idx + bit] = if byte & (1 << (7 - bit)) as u8 != 0 {
+                    self.format.fg
+                } else {
+                    self.format.bg
+                    // .wrapping_add(0x001104 * (idx / self.width) as u32)
+                    // .wrapping_add(0x141000 * (idx & 3) as u32)
                 }
             }
         }
@@ -164,7 +158,7 @@ impl UI {
         }
         self.time = Instant::now();
         // update framebuffer
-        self.fb.render(&mut self.window, &ch8.bus)?;
+        self.fb.render(&mut self.window, &ch8.screen)?;
         Ok(true)
     }
 
@@ -182,7 +176,6 @@ impl UI {
                 .into_iter()
                 .filter(|key| !self.window.get_keys().contains(key))
         };
-        use crate::ui::Region::*;
         for key in get_keys_released() {
             if let Some(key) = identify_key(key) {
                 ch8.cpu.release(key)?;
@@ -193,7 +186,7 @@ impl UI {
             use Key::*;
             match key {
                 F1 | Comma => ch8.cpu.dump(),
-                F2 | Period => ch8.bus.print_screen()?,
+                F2 | Period => ch8.screen.print_screen(),
                 F3 => {
                     debug_dump_screen(ch8, &self.rom).expect("Unable to write debug screen dump");
                 }
@@ -217,7 +210,7 @@ impl UI {
                 }),
                 F6 | Enter => {
                     eprintln!("Step");
-                    ch8.cpu.singlestep(&mut ch8.bus)?;
+                    ch8.cpu.singlestep(&mut ch8.screen)?;
                 }
                 F7 => {
                     eprintln!("Set breakpoint {:03x}.", ch8.cpu.pc());
@@ -230,7 +223,7 @@ impl UI {
                 F9 | Delete => {
                     eprintln!("Soft reset state.cpu {:03x}", ch8.cpu.pc());
                     ch8.cpu.soft_reset();
-                    ch8.bus.clear_region(Screen);
+                    ch8.screen.clear();
                 }
                 Escape => return Ok(false),
                 key => {
@@ -274,19 +267,9 @@ pub fn debug_dump_screen(ch8: &Chip8, rom: &Path) -> Result<()> {
         ch8.cpu.cycle()
     ));
     path.set_extension("bin");
-    if let Ok(_) = std::fs::write(
-        &path,
-        ch8.bus
-            .get_region(Region::Screen)
-            .expect("Region::Screen should exist"),
-    ) {
+    if std::fs::write(&path, ch8.screen.as_slice()).is_ok() {
         eprintln!("Saved to {}", &path.display());
-    } else if let Ok(_) = std::fs::write(
-        "screen_dump.bin",
-        ch8.bus
-            .get_region(Region::Screen)
-            .expect("Region::Screen should exist"),
-    ) {
+    } else if std::fs::write("screen_dump.bin", ch8.screen.as_slice()).is_ok() {
         eprintln!("Saved to screen_dump.bin");
     } else {
         eprintln!("Failed to dump screen to file.")

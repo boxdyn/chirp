@@ -13,15 +13,12 @@
 //! Some of these tests run >16M times, which is very silly
 
 use super::*;
-use crate::{
-    bus,
-    cpu::bus::{Bus, Region::*},
-};
+use crate::Screen;
 use rand::random;
 
 mod decode;
 
-fn setup_environment() -> (CPU, Bus) {
+fn setup_environment() -> (CPU, Screen) {
     let mut ch8 = (
         CPU {
             flags: Flags {
@@ -31,10 +28,7 @@ fn setup_environment() -> (CPU, Bus) {
             },
             ..CPU::default()
         },
-        bus! {
-            // Create a screen
-            Screen  [0x000..0x100] = include_bytes!("../../chip8Archive/roms/1dcell.ch8"),
-        },
+        Screen::default(),
     );
     ch8.0
         .load_program_bytes(include_bytes!("tests/roms/jumptest.ch8"))
@@ -43,9 +37,7 @@ fn setup_environment() -> (CPU, Bus) {
 }
 
 fn print_screen(bytes: &[u8]) {
-    bus! {Screen [0..0x100] = bytes}
-        .print_screen()
-        .expect("Printing screen should not fail if Screen exists.")
+    Screen::from(bytes).print_screen()
 }
 
 /// Unused instructions
@@ -57,9 +49,9 @@ mod unimplemented {
             $pub:vis test $name:ident { $($insn:literal),+$(,)? }
         );+ $(;)?) => {
             $( $(#[$attr])* #[test] $pub fn $name () {$(
-                let (mut cpu, mut bus) = setup_environment();
+                let (mut cpu, mut screen) = setup_environment();
                 cpu.mem.write(0x200u16, $insn as u16);
-                cpu.tick(&mut bus)
+                cpu.tick(&mut screen)
                     .expect_err(stringify!($insn is not an instruction));
             )*} )+
         };
@@ -95,10 +87,11 @@ mod sys {
     /// 00e0: Clears the screen memory to 0
     #[test]
     fn clear_screen() {
-        let (mut cpu, mut bus) = setup_environment();
-        cpu.clear_screen(&mut bus);
-        bus.get_region(Screen)
-            .expect("Expected screen, got None")
+        let (mut cpu, mut screen) = setup_environment();
+        cpu.clear_screen(&mut screen);
+        screen
+            .grab(..)
+            .unwrap()
             .iter()
             .for_each(|byte| assert_eq!(*byte, 0));
     }
@@ -751,7 +744,7 @@ mod io {
         #[test]
         fn draw() {
             for test in SCREEN_TESTS {
-                let (mut cpu, mut bus) = setup_environment();
+                let (mut cpu, mut screen) = setup_environment();
                 cpu.flags.quirks = test.quirks;
                 // Debug mode is 5x slower
                 cpu.flags.debug = false;
@@ -759,18 +752,13 @@ mod io {
                 cpu.mem.load_region(Program, test.program).unwrap();
                 // Run the test program for the specified number of steps
                 while cpu.cycle() < test.steps {
-                    cpu.multistep(&mut bus, 10.min(test.steps - cpu.cycle()))
+                    cpu.multistep(&mut screen, 10.min(test.steps - cpu.cycle()))
                         .expect("Draw tests should not contain undefined instructions");
                 }
                 // Compare the screen to the reference screen buffer
-                bus.print_screen()
-                    .expect("Printing screen should not fail if screen exists");
+                screen.print_screen();
                 print_screen(test.screen);
-                assert_eq!(
-                    bus.get_region(Screen)
-                        .expect("Getting screen should not fail if screen exists"),
-                    test.screen
-                );
+                assert_eq!(screen.grab(..).unwrap(), test.screen);
             }
         }
     }
@@ -1028,15 +1016,15 @@ mod io {
             // Perform DMA store
             cpu.i = addr as u16;
             cpu.store_dma(len);
-            // Check that bus grabbed the correct data
-            let bus = cpu
+            // Check that screen grabbed the correct data
+            let screen = cpu
                 .mem
                 .grab_mut(addr..addr + DATA.len())
                 .expect("Getting a mutable slice at addr 0x0456 should not fail");
-            assert_eq!(bus[0..=len], DATA[0..=len]);
-            assert_eq!(bus[len + 1..], [0; 16][len + 1..]);
+            assert_eq!(screen[0..=len], DATA[0..=len]);
+            assert_eq!(screen[len + 1..], [0; 16][len + 1..]);
             // clear
-            bus.fill(0);
+            screen.fill(0);
         }
     }
 
@@ -1074,11 +1062,11 @@ mod behavior {
         use std::time::Duration;
         #[test]
         fn delay() {
-            let (mut cpu, mut bus) = setup_environment();
+            let (mut cpu, mut screen) = setup_environment();
             cpu.flags.monotonic = false;
             cpu.delay = 10;
             for _ in 0..2 {
-                cpu.multistep(&mut bus, 8)
+                cpu.multistep(&mut screen, 8)
                     .expect("Running valid instructions should always succeed");
                 std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
             }
@@ -1087,11 +1075,11 @@ mod behavior {
         }
         #[test]
         fn sound() {
-            let (mut cpu, mut bus) = setup_environment();
+            let (mut cpu, mut screen) = setup_environment();
             cpu.flags.monotonic = false; // disable monotonic timing
             cpu.sound = 10;
             for _ in 0..2 {
-                cpu.multistep(&mut bus, 8)
+                cpu.multistep(&mut screen, 8)
                     .expect("Running valid instructions should always succeed");
                 std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
             }
@@ -1100,11 +1088,11 @@ mod behavior {
         }
         #[test]
         fn vbi_wait() {
-            let (mut cpu, mut bus) = setup_environment();
+            let (mut cpu, mut screen) = setup_environment();
             cpu.flags.monotonic = false; // disable monotonic timing
             cpu.flags.draw_wait = true;
             for _ in 0..2 {
-                cpu.multistep(&mut bus, 8)
+                cpu.multistep(&mut screen, 8)
                     .expect("Running valid instructions should always succeed");
                 std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
             }
@@ -1118,9 +1106,9 @@ mod behavior {
         #[test]
         #[cfg_attr(feature = "unstable", no_coverage)]
         fn hit_break() {
-            let (mut cpu, mut bus) = setup_environment();
+            let (mut cpu, mut screen) = setup_environment();
             cpu.set_break(0x202);
-            match cpu.multistep(&mut bus, 10) {
+            match cpu.multistep(&mut screen, 10) {
                 Err(crate::error::Error::BreakpointHit { addr, next }) => {
                     assert_eq!(0x202, addr); // current address is 202
                     assert_eq!(0x1204, next); // next insn is `jmp 204`
@@ -1133,9 +1121,9 @@ mod behavior {
         #[test]
         #[cfg_attr(feature = "unstable", no_coverage)]
         fn hit_break_singlestep() {
-            let (mut cpu, mut bus) = setup_environment();
+            let (mut cpu, mut screen) = setup_environment();
             cpu.set_break(0x202);
-            match cpu.singlestep(&mut bus) {
+            match cpu.singlestep(&mut screen) {
                 Err(crate::error::Error::BreakpointHit { addr, next }) => {
                     assert_eq!(0x202, addr); // current address is 202
                     assert_eq!(0x1204, next); // next insn is `jmp 204`
@@ -1150,10 +1138,10 @@ mod behavior {
     #[test]
     #[cfg_attr(feature = "unstable", no_coverage)]
     fn invalid_pc() {
-        let (mut cpu, mut bus) = setup_environment();
-        // The bus extends from 0x0..0x1000
+        let (mut cpu, mut screen) = setup_environment();
+        // The screen extends from 0x0..0x1000
         cpu.pc = 0x1001;
-        match cpu.tick(&mut bus) {
+        match cpu.tick(&mut screen) {
             Err(Error::InvalidAddressRange { range }) => {
                 eprintln!("InvalidAddressRange {{ {range:04x?} }}")
             }

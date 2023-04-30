@@ -9,17 +9,15 @@ const INDX: &[u8; 16] = b"\0\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d
 /// runs one arbitrary operation on a brand new CPU
 /// returns the CPU for inspection
 fn run_single_op(op: &[u8]) -> CPU {
-    let (mut cpu, mut bus) = (
+    let (mut cpu, mut screen) = (
         CPU::default(),
-        bus! {
-            Screen[0x0..0x1000],
-        },
+        Screen::default(),
     );
     cpu.mem
         .load_region(Program, op).unwrap();
     cpu.v = *INDX;
     cpu.flags.quirks = Quirks::from(false);
-    cpu.tick(&mut bus).unwrap(); // will panic if unimplemented
+    cpu.tick(&mut screen).unwrap(); // will panic if unimplemented
     cpu
 }
 

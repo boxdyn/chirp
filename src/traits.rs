@@ -3,4 +3,5 @@
 
 //! Traits useful for Chirp
 
-pub mod auto_cast;
+mod auto_cast;
+pub use auto_cast::{AutoCast, FallibleAutoCast, Grab};
