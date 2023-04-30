@@ -610,6 +610,7 @@ impl Default for CPU {
             stack: vec![],
             mem: mem! {
                 Charset [0x0050..0x00a0] = include_bytes!("mem/charset.bin"),
+                HiresCharset [0x00a0..0x0140] = include_bytes!("mem/hires.bin"),
                 Program [0x0200..0x1000],
             },
             font: 0x050,

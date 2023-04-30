@@ -76,6 +76,8 @@ impl Grab for Mem {
 pub enum Region {
     /// Character ROM (but writable!)
     Charset,
+    /// Hires character ROM
+    HiresCharset,
     /// Program memory
     Program,
     #[doc(hidden)]
