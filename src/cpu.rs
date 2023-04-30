@@ -14,7 +14,7 @@ pub mod mode;
 pub mod quirks;
 
 use self::{
-    bus::{Bus, Get, ReadWrite, Region::*},
+    bus::{Bus, Region::*},
     flags::Flags,
     instruction::{
         disassembler::{Dis, Disassembler},
@@ -26,6 +26,7 @@ use self::{
 use crate::{
     bus,
     error::{Error, Result},
+    traits::auto_cast::{AutoCast, Grab},
 };
 use imperative_rs::InstructionSet;
 use owo_colors::OwoColorize;
@@ -492,7 +493,7 @@ impl CPU {
         // Fetch slice of memory starting at pc, for var-width opcode 0xf000_iiii
         let opchunk = self
             .mem
-            .get(self.pc as usize..)
+            .grab(self.pc as usize..)
             .ok_or(Error::InvalidAddressRange {
                 range: (self.pc as usize..).into(),
             })?;

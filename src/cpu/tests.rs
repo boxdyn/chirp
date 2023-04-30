@@ -959,7 +959,7 @@ mod io {
                 let addr = cpu.i as usize;
                 assert_eq!(
                     cpu.mem
-                        .get(addr..addr.wrapping_add(5))
+                        .grab(addr..addr.wrapping_add(5))
                         .expect("Region at addr should exist!"),
                     test.output,
                 );
@@ -1004,7 +1004,10 @@ mod io {
 
                 cpu.bcd_convert(5);
 
-                assert_eq!(cpu.mem.get(addr..addr.saturating_add(3)), Some(test.output))
+                assert_eq!(
+                    cpu.mem.grab(addr..addr.saturating_add(3)),
+                    Some(test.output)
+                )
             }
         }
     }
@@ -1028,7 +1031,7 @@ mod io {
             // Check that bus grabbed the correct data
             let bus = cpu
                 .mem
-                .get_mut(addr..addr + DATA.len())
+                .grab_mut(addr..addr + DATA.len())
                 .expect("Getting a mutable slice at addr 0x0456 should not fail");
             assert_eq!(bus[0..=len], DATA[0..=len]);
             assert_eq!(bus[len + 1..], [0; 16][len + 1..]);
@@ -1046,7 +1049,7 @@ mod io {
         // Load some test data into memory
         let addr = 0x456;
         cpu.mem
-            .get_mut(addr..addr + DATA.len())
+            .grab_mut(addr..addr + DATA.len())
             .expect("Getting a mutable slice at addr 0x0456..0x0466 should not fail")
             .write_all(DATA)
             .unwrap();

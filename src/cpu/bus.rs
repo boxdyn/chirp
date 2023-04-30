@@ -24,21 +24,14 @@ use std::{
 #[macro_export]
 macro_rules! bus {
     ($($name:path $(:)? [$range:expr] $(= $data:expr)?) ,* $(,)?) => {
-        $crate::cpu::bus::Bus::default()
-        $(
-            .add_region_owned($name, $range)
-            $(
-                .load_region_owned($name, $data)
-            )?
-        )*
+        $crate::cpu::bus::Bus::default()$(.add_region_owned($name, $range)$(.load_region_owned($name, $data))?)*
     };
 }
 
-pub mod read;
-pub use read::{Get, ReadWrite};
+pub use crate::traits::auto_cast::{AutoCast, Grab};
 
 // Traits Read and Write are here purely to make implementing other things more bearable
-impl Get<u8> for Bus {
+impl Grab<u8> for Bus {
     /// Gets a slice of [Bus] memory
     /// # Examples
     /// ```rust
@@ -51,7 +44,7 @@ impl Get<u8> for Bus {
     ///# }
     /// ```
     #[inline(always)]
-    fn get<I>(&self, index: I) -> Option<&<I as SliceIndex<[u8]>>::Output>
+    fn grab<I>(&self, index: I) -> Option<&<I as SliceIndex<[u8]>>::Output>
     where
         I: SliceIndex<[u8]>,
     {
@@ -70,7 +63,7 @@ impl Get<u8> for Bus {
     ///# }
     /// ```
     #[inline(always)]
-    fn get_mut<I>(&mut self, index: I) -> Option<&mut <I as SliceIndex<[u8]>>::Output>
+    fn grab_mut<I>(&mut self, index: I) -> Option<&mut <I as SliceIndex<[u8]>>::Output>
     where
         I: SliceIndex<[u8]>,
     {
@@ -294,7 +287,7 @@ impl Bus {
     #[inline(always)]
     pub fn get_region(&self, name: Region) -> Option<&[u8]> {
         debug_assert!(self.region.get(name as usize).is_some());
-        self.get(self.region.get(name as usize)?.clone()?)
+        self.grab(self.region.get(name as usize)?.clone()?)
     }
 
     /// Gets a mutable slice of a named region of memory
@@ -311,7 +304,7 @@ impl Bus {
     #[inline(always)]
     pub fn get_region_mut(&mut self, name: Region) -> Option<&mut [u8]> {
         debug_assert!(self.region.get(name as usize).is_some());
-        self.get_mut(self.region.get(name as usize)?.clone()?)
+        self.grab_mut(self.region.get(name as usize)?.clone()?)
     }
 
     /// Prints the region of memory called `Screen` at 1bpp using box characters

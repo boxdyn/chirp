@@ -125,7 +125,7 @@ impl CPU {
     ///
     /// Corresponds to [Insn::scr]
     #[inline(always)]
-    pub(super) fn scroll_right(&mut self, screen: &mut impl ReadWrite<u128>) {
+    pub(super) fn scroll_right(&mut self, screen: &mut impl AutoCast<u128>) {
         // Get a line from the bus
         for i in (0..16 * 64_usize).step_by(16) {
             //let line: u128 = bus.read(self.screen + i) >> 4;
@@ -137,7 +137,7 @@ impl CPU {
     ///
     /// Corresponds to [Insn::scl]
     #[inline(always)]
-    pub(super) fn scroll_left(&mut self, screen: &mut impl ReadWrite<u128>) {
+    pub(super) fn scroll_left(&mut self, screen: &mut impl AutoCast<u128>) {
         // Get a line from the bus
         for i in (0..16 * 64_usize).step_by(16) {
             let line: u128 = u128::wrapping_shl(screen.read(i), 4);
@@ -461,7 +461,7 @@ impl CPU {
     pub(super) fn draw_sprite(&mut self, x: u16, y: u16, n: Nib, w: u16, h: u16, screen: &mut Bus) {
         let w_bytes = w / 8;
         self.v[0xf] = 0;
-        if let Some(sprite) = self.mem.get(self.i as usize..(self.i + n as u16) as usize) {
+        if let Some(sprite) = self.mem.grab(self.i as usize..(self.i + n as u16) as usize) {
             for (line, &sprite) in sprite.iter().enumerate() {
                 let line = line as u16;
                 let sprite = ((sprite as u16) << (8 - (x % 8))).to_be_bytes();
@@ -511,7 +511,7 @@ impl CPU {
     pub(super) fn draw_schip_sprite(&mut self, x: u16, y: u16, w: u16, screen: &mut Bus) {
         self.v[0xf] = 0;
         let w_bytes = w / 8;
-        if let Some(sprite) = self.mem.get(self.i as usize..(self.i + 32) as usize) {
+        if let Some(sprite) = self.mem.grab(self.i as usize..(self.i + 32) as usize) {
             let sprite = sprite.to_owned();
             for (line, sprite) in sprite.chunks_exact(2).enumerate() {
                 let sprite = u16::from_be_bytes(
@@ -656,7 +656,7 @@ impl CPU {
         let i = self.i as usize;
         for (reg, value) in self
             .mem
-            .get_mut(i..=i + x)
+            .grab_mut(i..=i + x)
             .unwrap_or_default()
             .iter_mut()
             .enumerate()
@@ -679,7 +679,7 @@ impl CPU {
         let i = self.i as usize;
         for (reg, value) in self
             .mem
-            .get(i..=i + x)
+            .grab(i..=i + x)
             .unwrap_or_default()
             .iter()
             .enumerate()
@@ -719,7 +719,7 @@ impl CPU {
         // TODO: Save these, maybe
         for (reg, value) in self
             .mem
-            .get_mut(0..=x)
+            .grab_mut(0..=x)
             .unwrap_or_default()
             .iter_mut()
             .enumerate()
@@ -734,7 +734,7 @@ impl CPU {
     /// Corresponds to [Insn::flgi]
     #[inline(always)]
     pub(super) fn load_flags(&mut self, x: Reg) {
-        for (reg, value) in self.mem.get(0..=x).unwrap_or_default().iter().enumerate() {
+        for (reg, value) in self.mem.grab(0..=x).unwrap_or_default().iter().enumerate() {
             self.v[reg] = *value;
         }
     }
