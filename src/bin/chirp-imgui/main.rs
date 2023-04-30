@@ -10,6 +10,7 @@ mod gui;
 use crate::args::Arguments;
 use crate::emu::*;
 use crate::gui::*;
+use owo_colors::OwoColorize;
 use pixels::{Pixels, SurfaceTexture};
 use std::result::Result;
 use winit::dpi::LogicalSize;
@@ -31,6 +32,15 @@ struct Application {
 
 fn main() -> Result<(), error::Error> {
     let args = Arguments::parse();
+    // Make sure the ROM file exists
+    if !args.file.is_file() {
+        eprintln!(
+            "{} not found. If the file exists, you might not have permission you access it.",
+            args.file.display().italic().red()
+        );
+        return Ok(());
+    }
+
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
 
