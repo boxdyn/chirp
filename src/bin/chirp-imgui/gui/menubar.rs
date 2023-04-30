@@ -2,7 +2,7 @@
 
 use super::Drawable;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Menubar {
     pub(super) active: bool,
     pub file: File,
@@ -86,12 +86,12 @@ impl Drawable for Help {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd)]
 pub struct Settings {
     pub(super) target_ipf: usize,
     pub(super) quirks: chirp::Quirks,
     pub(super) mode_index: usize,
-    pub(super) colors: [[u8; 4]; 2],
+    pub(super) colors: [[f32; 4]; 2],
     pub(super) applied: bool,
 }
 
@@ -100,6 +100,12 @@ impl Drawable for Settings {
         self.applied = false;
         ui.menu("Settings", || {
             use chirp::Mode::*;
+            ui.menu("Foreground Color", || {
+                self.applied |= ui.color_picker4("", &mut self.colors[0])
+            });
+            ui.menu("Background Color", || {
+                self.applied |= ui.color_picker4("", &mut self.colors[1])
+            });
             const MODES: [chirp::Mode; 3] = [Chip8, SChip, XOChip];
             if ui.combo_simple_string("Mode", &mut self.mode_index, &MODES) {
                 self.quirks = MODES[self.mode_index].into();
@@ -115,7 +121,7 @@ impl Drawable for Settings {
                     | ui.checkbox("Screen wraps at edge", &mut self.quirks.screen_wrap)
                     | ui.checkbox("Shift ops ignore vY", &mut self.quirks.shift)
                     | ui.checkbox("Jumps behave eratically", &mut self.quirks.stupid_jumps)
-            }
+            };
         })
     }
 }
@@ -127,7 +133,32 @@ impl Settings {
     pub fn quirks(&mut self) -> &mut chirp::Quirks {
         &mut self.quirks
     }
-    pub fn applied(&mut self) -> Option<(usize, chirp::Quirks)> {
-        self.applied.then_some((self.target_ipf, self.quirks))
+    pub fn set_mode(&mut self, mode: chirp::Mode) {
+        self.mode_index = mode as usize;
+    }
+    pub fn set_color(&mut self, fg: &[u8; 4], bg: &[u8; 4]) {
+        for (idx, component) in fg.iter().enumerate() {
+            self.colors[0][idx] = *component as f32 / 255.0;
+        }
+        for (idx, component) in bg.iter().enumerate() {
+            self.colors[1][idx] = *component as f32 / 255.0;
+        }
+    }
+    pub fn applied(&mut self) -> Option<(usize, chirp::Quirks, [u8; 4], [u8; 4])> {
+        let (fg, bg) = (self.colors[0], self.colors[1]);
+        let fg = [
+            (fg[0] * 255.0) as u8,
+            (fg[1] * 255.0) as u8,
+            (fg[2] * 255.0) as u8,
+            (fg[3] * 255.0) as u8,
+        ];
+        let bg = [
+            (bg[0] * 255.0) as u8,
+            (bg[1] * 255.0) as u8,
+            (bg[2] * 255.0) as u8,
+            (bg[3] * 255.0) as u8,
+        ];
+        self.applied
+            .then_some((self.target_ipf, self.quirks, fg, bg))
     }
 }

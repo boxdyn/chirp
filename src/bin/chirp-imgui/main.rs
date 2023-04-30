@@ -2,10 +2,12 @@
 #![deny(clippy::all)]
 #![allow(dead_code)] // TODO: finish writing the code
 
+mod args;
 mod emu;
 mod error;
 mod gui;
 
+use crate::args::Arguments;
 use crate::emu::*;
 use crate::gui::*;
 use pixels::{Pixels, SurfaceTexture};
@@ -28,17 +30,11 @@ struct Application {
 }
 
 fn main() -> Result<(), error::Error> {
-    let rom_path;
-    if let Some(path) = std::env::args().nth(1) {
-        rom_path = path;
-    } else {
-        panic!("Supply a rom!");
-    }
-
+    let args = Arguments::parse();
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
 
-    let size = LogicalSize::new(128 * 6, 64 * 6);
+    let size = LogicalSize::new(128 * 8, 64 * 8);
     let window = WindowBuilder::new()
         .with_title("Chirp")
         .with_inner_size(size)
@@ -52,13 +48,18 @@ fn main() -> Result<(), error::Error> {
         Pixels::new(128, 64, surface_texture)?
     };
 
-    let mut app = Application::new(
-        Emulator::new(INIT_SPEED, rom_path),
-        Gui::new(&window, &pixels),
-    );
-
+    let mut gui = Gui::new(&window, &pixels);
     // set initial parameters
-    *app.gui.menubar.settings.target_ipf() = INIT_SPEED;
+    if let Some(mode) = args.mode {
+        gui.menubar.settings.set_mode(mode);
+    }
+
+    gui.menubar.settings.set_color(FOREGROUND, BACKGROUND);
+    *gui.menubar.settings.target_ipf() = args.speed.unwrap_or(INIT_SPEED);
+
+    let mut app = Application::new(args.into(), gui);
+
+    // Copy quirks from the running Emulator, for consistency
     *app.gui.menubar.settings.quirks() = app.emu.quirks();
 
     // Run event loop
@@ -114,10 +115,10 @@ fn main() -> Result<(), error::Error> {
                 state.emu.input(&input)?;
 
                 // Apply settings
-                if let Some((ipf, quirks)) = state.gui.menubar.settings.applied() {
+                if let Some((ipf, quirks, fg, bg)) = state.gui.menubar.settings.applied() {
                     state.emu.ipf = ipf;
                     state.emu.set_quirks(quirks);
-                    println!("'A");
+                    state.emu.colors = [fg, bg];
                 }
 
                 // Update the scale factor
