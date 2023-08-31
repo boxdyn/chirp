@@ -5,7 +5,8 @@
 //! TODO: Destroy this all.
 
 use super::Chip8;
-use chirp::{error::Result, screen::Screen};
+use crate::error::Result;
+use chirp::screen::Screen;
 use minifb::*;
 use std::{
     path::{Path, PathBuf},
@@ -144,7 +145,7 @@ pub struct UI {
 }
 
 impl UI {
-    pub fn frame(&mut self, ch8: &mut Chip8) -> Result<bool> {
+    pub fn frame(&mut self, ch8: &Chip8) -> Result<bool> {
         if ch8.cpu.flags.pause {
             self.window.set_title("Chirp ⏸")
         } else {

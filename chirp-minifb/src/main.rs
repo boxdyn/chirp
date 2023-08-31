@@ -6,10 +6,13 @@
 
 #[cfg(test)]
 mod tests;
+
+mod error;
 mod ui;
 
 use chirp::error::Error::BreakpointHit;
-use chirp::{error::Result, *};
+use chirp::*;
+use error::Result;
 use gumdrop::*;
 use owo_colors::OwoColorize;
 use std::{
@@ -162,7 +165,7 @@ impl State {
         self.ui.keys(&mut self.ch8)
     }
     fn frame(&mut self) -> Result<bool> {
-        self.ui.frame(&mut self.ch8)
+        self.ui.frame(&self.ch8)
     }
     fn tick_cpu(&mut self) -> Result<()> {
         if !self.ch8.cpu.flags.pause {
@@ -209,7 +212,7 @@ impl Iterator for State {
         }
         // Allow breakpoint hit messages
         match self.tick_cpu() {
-            Err(BreakpointHit { addr, next }) => {
+            Err(error::Error::Chirp(BreakpointHit { addr, next })) => {
                 eprintln!("Breakpoint hit: {:3x} ({:4x})", addr, next);
             }
             Err(e) => return Some(Err(e)),

@@ -1,5 +1,7 @@
 
 # Rust files
+**/target
+**/Cargo.lock
 /target
 Cargo.lock
 flamegraph.svg

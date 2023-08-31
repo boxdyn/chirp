@@ -3,6 +3,7 @@
 
 use super::ui::*;
 use super::Chip8;
+use crate::error::Result;
 use chirp::*;
 use std::{collections::hash_map::DefaultHasher, hash::Hash};
 
@@ -37,8 +38,8 @@ mod ui {
     #[test]
     fn frame() -> Result<()> {
         let mut ui = UIBuilder::new(32, 64, "dummy.ch8").build()?;
-        let mut ch8 = new_chip8();
-        ui.frame(&mut ch8).unwrap();
+        let ch8 = new_chip8();
+        ui.frame(&ch8).unwrap();
         Ok(())
     }
     #[test]

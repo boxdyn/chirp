@@ -1,0 +1,23 @@
+[package]
+name = "chirp-imgui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+chirp = { path = ".." }
+
+gumdrop = "0.8.1"
+owo-colors = "3"
+thiserror = "1.0.39"
+
+imgui = { version = "^0.11" }
+imgui-winit-support = { version = "^0.11" }
+imgui-wgpu = { version = "^0.23" }
+pixels = { version = "^0" }
+# TODO: When imgui-winit-support updates to 0.28 (Soon:tm:), update winit and winit_input_helper
+winit = { version = "0.27.5", features = ["default", "x11"] }
+winit_input_helper = { version = "^0.13.0" }
