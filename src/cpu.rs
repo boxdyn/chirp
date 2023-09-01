@@ -539,6 +539,7 @@ impl CPU {
     /// ```
     pub fn dump(&self) {
         //let dumpstyle = owo_colors::Style::new().bright_black();
+        use std::fmt::Write;
         std::println!(
             "PC: {:04x}, SP: {:04x}, I: {:04x}\n{}DLY: {}, SND: {}, CYC: {:6}",
             self.pc,
@@ -547,16 +548,17 @@ impl CPU {
             self.v
                 .into_iter()
                 .enumerate()
-                .map(|(i, gpr)| {
-                    format!(
-                        "v{i:X}: {gpr:02x} {}",
+                .fold(String::new(), |mut s, (i, gpr)| {
+                    let _ = write!(
+                        s,
+                        "{}v{i:X}: {gpr:02x}",
                         match i % 4 {
-                            3 => "\n",
+                            0 => "\n",
                             _ => "",
                         }
-                    )
-                })
-                .collect::<String>(),
+                    );
+                    s
+                }),
             self.delay,
             self.sound,
             self.cycle,

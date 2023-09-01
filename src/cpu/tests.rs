@@ -956,7 +956,7 @@ mod io {
     }
 
     mod bcdtest {
-        pub(self) use super::*;
+        use super::*;
 
         struct BCDTest {
             // value to test
