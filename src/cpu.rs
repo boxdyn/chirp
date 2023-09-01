@@ -431,6 +431,9 @@ impl CPU {
         //let speed = 1.0 / steps as f64;
         for _ in 0..steps {
             self.tick(screen)?;
+            if self.flags.is_paused() {
+                break;
+            }
         }
         self.delay = self.delay.saturating_sub(1);
         self.sound = self.sound.saturating_sub(1);
