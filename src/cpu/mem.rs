@@ -91,6 +91,7 @@ impl Display for Region {
             f,
             "{}",
             match self {
+                Region::HiresCharset => "HiresCharset",
                 Region::Charset => "Charset",
                 Region::Program => "Program",
                 _ => "",
