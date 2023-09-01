@@ -399,9 +399,7 @@ impl CPU {
     /// ```rust
     /// # use chirp::*;
     /// let mut cpu = CPU::default();
-    /// let mut screen = mem!{
-    ///     Screen  [0x000..0x100],
-    /// };
+    /// let mut screen = Screen::default();
     /// cpu.load_program_bytes(&[0x00, 0xe0, 0x22, 0x02]);
     /// cpu.singlestep(&mut screen).unwrap();
     /// assert_eq!(0x202, cpu.pc());
@@ -422,9 +420,7 @@ impl CPU {
     /// ```rust
     /// # use chirp::*;
     /// let mut cpu = CPU::default();
-    /// let mut screen = mem!{
-    ///     Screen  [0x000..0x100],
-    /// };
+    /// let mut screen = Screen::default();
     /// cpu.load_program_bytes(&[0x00, 0xe0, 0x22, 0x02]);
     /// cpu.multistep(&mut screen, 0x20)
     ///     .expect("The program should only have valid opcodes.");
@@ -453,11 +449,9 @@ impl CPU {
     /// ```rust
     /// # use chirp::*;
     /// let mut cpu = CPU::default();
-    /// let mut bus = mem!{
-    ///     Screen  [0x000..0x100],
-    /// };
+    /// let mut screen = Screen::default();
     /// cpu.load_program_bytes(&[0x00, 0xe0, 0x22, 0x02]);
-    /// cpu.tick(&mut bus)
+    /// cpu.tick(&mut screen)
     ///     .expect("0x00e0 (cls) should be a valid opcode.");
     /// assert_eq!(0x202, cpu.pc());
     /// assert_eq!(1, cpu.cycle());
@@ -470,9 +464,7 @@ impl CPU {
     /// let mut cpu = CPU::default();
     /// # cpu.flags.debug = true;        // enable live disassembly
     /// # cpu.flags.monotonic = true; // enable monotonic/test timing
-    /// let mut bus = mem!{
-    ///     Screen  [0x0f00..0x1000],
-    /// };
+    /// let mut bus = Screen::default();
     /// cpu.load_program_bytes(&[
     ///     0xff, 0xff, // invalid!
     ///     0x22, 0x02, // jump 0x202

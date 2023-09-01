@@ -72,9 +72,9 @@ impl Screen {
     /// ```rust
     ///# use chirp::screen::Screen;
     /// let mut screen = Screen::new(256);
-    /// assert_eq!(1234, screen.len());
+    /// assert_eq!(256, screen.len());
     /// screen.with_size(0);
-    /// assert_eq!(1234, screen.len());
+    /// assert_eq!(256, screen.len());
     /// ```
     pub fn with_size(&mut self, size: usize) {
         if self.len() < size {

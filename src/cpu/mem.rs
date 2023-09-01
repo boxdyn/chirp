@@ -15,7 +15,7 @@ use std::{
 /// Creates a new [Mem], growing as needed
 /// # Examples
 /// ```rust
-/// # use chirp::*;
+/// use chirp::{cpu::mem::Region::*, *};
 /// let mut mem = mem! {
 ///     Charset   [0x0000..0x0800] = b"ABCDEF",
 ///     Program [0x0800..0xf000] = include_bytes!("mem.rs"),
@@ -33,7 +33,7 @@ impl Grab for Mem {
     /// Gets a slice of [Mem] memory
     /// # Examples
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mem = Mem::new()
     ///         .add_region_owned(Program, 0..10);
@@ -52,7 +52,7 @@ impl Grab for Mem {
     /// Gets a mutable slice of [Mem] memory
     /// # Examples
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mut mem = Mem::new()
     ///         .add_region_owned(Program, 0..10);
@@ -112,7 +112,7 @@ impl Mem {
     /// Constructs a new mem
     /// # Examples
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mem = Mem::new();
     ///     assert!(mem.is_empty());
@@ -126,7 +126,7 @@ impl Mem {
     /// Gets the length of the mem' backing memory
     /// # Examples
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mem = Mem::new()
     ///         .add_region_owned(Program, 0..1234);
@@ -141,7 +141,7 @@ impl Mem {
     /// Returns true if the backing memory contains no elements
     /// # Examples
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mem = Mem::new();
     ///     assert!(mem.is_empty());
@@ -155,7 +155,7 @@ impl Mem {
     /// Grows the Mem backing memory to at least size bytes, but does not truncate
     /// # Examples
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mut mem = Mem::new();
     ///     mem.with_size(1234);
@@ -165,7 +165,7 @@ impl Mem {
     ///#    Ok(())
     ///# }
     /// ```
-    fn with_size(&mut self, size: usize) {
+    pub fn with_size(&mut self, size: usize) {
         if self.len() < size {
             self.memory.resize(size, 0);
         }
@@ -180,7 +180,7 @@ impl Mem {
     /// Adds a new named range ([Region]) to a [Mem]
     /// # Examples
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mut mem = Mem::new();
     ///     mem.add_region(Program, 0..1234);
@@ -199,7 +199,7 @@ impl Mem {
     /// Updates an existing [Region]
     /// # Examples
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mut mem = Mem::new().add_region_owned(Program, 0..1234);
     ///     mem.set_region(Program, 1234..2345);
@@ -224,7 +224,7 @@ impl Mem {
     /// Loads data into a named [Region]
     /// # Examples
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mem = Mem::new()
     ///         .add_region_owned(Program, 0..1234)
@@ -244,7 +244,7 @@ impl Mem {
     /// Fills a [Region] with zeroes
     /// # Examples
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mem = Mem::new()
     ///         .add_region_owned(Program, 0..1234)
@@ -255,11 +255,11 @@ impl Mem {
     /// ```
     /// If the region doesn't exist, that's okay.
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mem = Mem::new()
     ///         .add_region_owned(Program, 0..1234)
-    ///         .clear_region(Screen);
+    ///         .clear_region(Program);
     ///# // TODO: test if region actually clear
     ///#    Ok(())
     ///# }
@@ -274,7 +274,7 @@ impl Mem {
     /// Gets a slice of a named [Region] of memory
     /// # Examples
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mem = Mem::new()
     ///         .add_region_owned(Program, 0..10);
@@ -291,7 +291,7 @@ impl Mem {
     /// Gets a mutable slice of a named region of memory
     /// # Examples
     /// ```rust
-    ///# use chirp::*;
+    /// use chirp::{cpu::mem::{Region::*, Mem}, *};
     ///# fn main() -> Result<()> {
     ///     let mut mem = Mem::new()
     ///         .add_region_owned(Program, 0..10);

@@ -31,11 +31,11 @@ pub trait AutoCast<T>: FallibleAutoCast<T> {
     ///
     /// # May Panic
     ///
-    /// If the type is not [Default], this will panic on error.
+    /// This will panic on error. For a non-panicking implementation, do it yourself.
     fn read(&self, addr: impl Into<usize>) -> T {
         self.read_fallible(addr).unwrap_or_else(|e| panic!("{e:?}"))
     }
-    /// Write a T to address `addr`
+    /// Writes a T to address `addr`
     ///
     /// # Will Panic
     ///
@@ -63,7 +63,7 @@ pub trait FallibleAutoCast<T>: Grab {
 /// - `Self::to_be_bytes`
 macro_rules! impl_rw {($($t:ty) ,* $(,)?) =>{
     $(
-        #[doc = concat!("Read or Write [", stringify!($t), "] at address `addr`, *discarding errors*.\n\nThis will never panic.")]
+        #[doc = concat!("Read or Write [`", stringify!($t), "`] at address `addr`, *discarding errors*.\n\nThis will never panic.")]
         impl<T: Grab + FallibleAutoCast<$t>> AutoCast<$t> for T {
             #[inline(always)]
             fn read(&self, addr: impl Into<usize>) -> $t {
@@ -79,12 +79,12 @@ macro_rules! impl_rw {($($t:ty) ,* $(,)?) =>{
             #[inline(always)]
             fn read_fallible(&self, addr: impl Into<usize>) -> $crate::error::Result<$t> {
                 let addr: usize = addr.into();
-                let range = addr..addr + core::mem::size_of::<$t>();
-                if let Some(bytes) = self.grab(range.clone()) {
+                let top = addr + core::mem::size_of::<$t>();
+                if let Some(bytes) = self.grab(addr..top) {
                     // Chip-8 is a big-endian system
                     Ok(<$t>::from_be_bytes(bytes.try_into()?))
                 } else {
-                    Err($crate::error::Error::InvalidAddressRange{range: range.into()})
+                    Err($crate::error::Error::InvalidAddressRange{range: (addr..top).into()})
                 }
             }
             #[inline(always)]
