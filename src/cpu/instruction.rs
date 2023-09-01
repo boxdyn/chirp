@@ -130,6 +130,7 @@ pub enum Insn {
     #[opcode = "0x00fc"]
     scl,
     /// | 00fd | Exit (halt and catch fire)
+    #[opcode = "0x0000"]
     #[opcode = "0x00fd"]
     halt,
     /// | 00fe | Return to low-resolution mode
@@ -161,6 +162,14 @@ pub enum Insn {
     /// | F000 | Load long address into character I
     #[opcode = "0xf000_iiii"]
     long { i: usize },
+}
+
+impl From<&Insn> for u32 {
+    fn from(value: &Insn) -> Self {
+        let mut buf = [0u8;4];
+        let len = Insn::encode(value, &mut buf).unwrap_or_default();
+        u32::from_be_bytes(buf) >> ((4-len)*8)
+    }
 }
 
 impl Display for Insn {
